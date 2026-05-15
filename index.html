@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>猫咪饮水监控面板</title>
+  <style>
+    :root{
+      --bg:#faf7f2;
+      --panel:#fdfaf5;
+      --card:#fdfaf5;
+      --soft:#f7f2e8;
+      --line:#e5dcd0;
+      --text:#2c2416;
+      --muted:#9b8c7d;
+      --brand:#c7762e;
+      --brand-hover:#a85e1e;
+      --ok:#5a8a3c;
+      --warn:#c7762e;
+      --danger:#c4554a;
+      --radius:20px;
+      --shadow:0 8px 32px rgba(44,36,22,.06);
+      --font-heading:Georgia,"Noto Serif SC","STSong",serif;
+      --font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    html{scroll-behavior:auto}
+    body{
+      margin:0;
+      font-family:var(--font-body);
+      color:var(--text);
+      background:linear-gradient(180deg,#faf7f2,#f3efe4);
+      min-height:100vh;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+    body::before{
+      content:'';
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:0;
+      opacity:.04;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size:256px 256px;
+    }
+    body,button,input,select,textarea{font-synthesis-weight:none}
+    .wrap{width:min(1440px,calc(100vw - 32px));margin:20px auto 40px;position:relative;z-index:1}
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:flex-start;
+      padding:24px 28px;
+      border:1px solid var(--line);
+      border-radius:24px;
+      background:var(--panel);
+      box-shadow:var(--shadow);
+    }
+    .topbar h1{
+      margin:0;
+      font-family:var(--font-heading);
+      font-size:32px;
+      line-height:1.15;
+      font-weight:700;
+      letter-spacing:-.01em;
+    }
+    .topbar p{margin:8px 0 0;color:var(--muted);font-size:14px;max-width:720px;line-height:1.5}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end;min-width:0}
+    .actions-main,.actions-secondary{display:flex;gap:10px;flex-wrap:wrap;align-items:center;min-width:0}
+    .actions-secondary .btn.ghost{opacity:1}
+
+    .pill{
+      padding:9px 16px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:600;
+      border:1px solid rgba(90,138,60,.15);
+      background:#edf7e8;
+      color:var(--ok);
+      letter-spacing:.01em;
+    }
+    .mode-option{
+      border:0;
+      background:transparent;
+      color:var(--muted);
+      padding:9px 14px;
+      border-radius:12px;
+      font-size:14px;
+      font-weight:600;
+      cursor:pointer;
+      transition:all .2s ease;
+      white-space:nowrap;
+      font-family:var(--font-body);
+    }
+    .mode-option.active{background:#f5ede0;color:#8b5e24;box-shadow:none}
+    .mode-option:not(.active):hover{color:var(--text);background:var(--soft)}
+
+    .btn{
+      border:0;
+      border-radius:14px;
+      padding:12px 18px;
+      font-weight:600;
+      cursor:pointer;
+      font-family:var(--font-body);
+      font-size:14px;
+      transition:all .2s ease;
+    }
+    .btn.primary{background:var(--brand);color:#fff}
+    .btn.primary:hover{background:var(--brand-hover)}
+    .btn.ghost{background:var(--card);color:var(--text);border:1px solid var(--line)}
+    .btn.ghost:hover{background:var(--soft)}
+
+    .grid{display:grid;gap:18px;margin-top:18px}
+    .hero-grid{grid-template-columns:minmax(0,1.45fr) minmax(320px,.95fr)}
+    .stats-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .main-grid{grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr)}
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      transition:box-shadow .3s ease;
+    }
+    .card:hover{box-shadow:0 12px 40px rgba(44,36,22,.08)}
+    .defer{content-visibility:auto;contain-intrinsic-size:320px;contain:layout paint}
+    .inner{padding:20px}
+
+    .card-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+    .card-title h2,.card-title h3{
+      margin:0;
+      font-family:var(--font-heading);
+      font-size:18px;
+      font-weight:700;
+      line-height:1.2;
+    }
+
+    .subtle{font-size:13px;color:var(--muted);line-height:1.45;word-break:break-word}
+    .hero-bottom .subtle{font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .hero{
+      min-height:360px;
+      position:relative;
+      background:#2a2419;
+      background-size:cover;
+      background-position:center;
+      border-radius:var(--radius);
+    }
+    .hero .overlay{
+      position:absolute;
+      inset:0;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      background:linear-gradient(180deg,rgba(42,36,25,.70),rgba(42,36,25,.30) 40%,rgba(42,36,25,.05) 100%);
+    }
+    .hero-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+    .hero-header-left{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;min-width:0;flex-direction:column}
+    .hero-header-right{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:0}
+
+    .live,.hero-tag{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      background:rgba(253,250,245,.94);
+      border:1px solid rgba(229,220,208,.60);
+      padding:8px 14px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:600;
+      color:#4a3f2f;
+      max-width:100%;
+      white-space:nowrap;
+    }
+    .hero-tag{background:#f4f0e5;border-color:#e0d8c4;color:#6b5c3a}
+
+    .dot{width:8px;height:8px;border-radius:999px;background:var(--ok);box-shadow:0 0 0 4px rgba(90,138,60,.12)}
+
+    .hero-bottom{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      max-width:100%;
+      padding:12px 16px;
+      border-radius:999px;
+      background:rgba(253,250,245,.50);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      border:1px solid rgba(229,220,208,.50);
+      box-shadow:0 6px 20px rgba(44,36,22,.08);
+    }
+    .hero-bottom-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+    .hero-bottom h2{
+      margin:0;
+      font-family:var(--font-heading);
+      font-size:20px;
+      font-weight:700;
+      color:#2c2416;
+      line-height:1.15;
+    }
+
+    .chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .chip{
+      padding:6px 12px;
+      border-radius:999px;
+      background:rgba(253,250,245,.94);
+      border:1px solid rgba(229,220,208,.80);
+      font-size:11px;
+      font-weight:600;
+      color:#5c4f3a;
+      max-width:100%;
+      white-space:nowrap;
+    }
+    .mode-option.inline-btn{
+      padding:8px 14px;
+      min-height:auto;
+      border-radius:999px;
+      background:var(--card);
+      border:1px solid var(--line);
+    }
+    .hero[data-loaded='0'] .hero-bottom{opacity:.96}
+
+    @media (max-width:1120px){
+      .hero-grid,.main-grid,.stats-grid{grid-template-columns:1fr}
+      .stats-two{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:820px){
+      .hero-header{gap:12px}
+      .hero-header-right{justify-content:flex-start}
+      .actions{justify-content:flex-start}
+      .actions-main,.actions-secondary{width:100%}
+      .topbar{align-items:flex-start}
+      .wrap{width:min(100vw - 20px,1440px);margin:10px auto 28px}
+      .topbar h1{font-size:28px}
+      .hero{min-height:320px}
+      .hero-bottom{max-width:100%;padding:12px 14px;border-radius:18px;align-items:flex-start;flex-direction:column}
+      .hero-bottom-main{width:100%}
+      .hero-bottom h2{font-size:20px}
+      .hero-bottom .subtle{white-space:normal}
+      .chips{justify-content:flex-start}
+      .hero-tag,.live,.chip,.mode-option.inline-btn{font-size:11px;padding:6px 10px}
+    }
+    @media (max-width:640px){
+      .stats-two{grid-template-columns:1fr}
+      .value{font-size:30px}
+      .stat{min-height:132px}
+      .event{grid-template-columns:64px 1fr}
+      .thumb,.thumb img{width:64px;height:56px}
+      .live,.hero-tag,.chip,.mode-option.inline-btn{white-space:normal;line-height:1.3}
+    }
+
+    .stats-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .stat{padding:20px;min-height:142px;display:flex;flex-direction:column;justify-content:space-between}
+    .label{font-family:var(--font-heading);font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+    .value{font-size:36px;font-weight:700;letter-spacing:-.02em;margin-top:8px;line-height:1.05;word-break:break-word}
+    .foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+    .up{color:var(--ok)}.down{color:var(--warn)}.danger{color:var(--danger)}
+
+    .event{
+      display:grid;
+      grid-template-columns:84px minmax(0,1fr) auto;
+      gap:14px;
+      align-items:center;
+      padding:14px;
+      border-radius:16px;
+      background:var(--soft);
+      border:1px solid var(--line);
+      transition:background .2s ease;
+    }
+    .event:hover{background:#f2ecde}
+    .thumb{width:84px;height:64px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,rgba(199,118,46,.18),rgba(90,138,60,.12))}
+    .thumb img{width:84px;height:64px;object-fit:cover;display:block}
+    .event strong{display:block;margin-bottom:6px;font-size:15px;font-family:var(--font-heading)}
+    .event span{font-size:13px;color:var(--muted);line-height:1.5}
+    .event-side{text-align:right;min-width:116px}
+    .event-side .big{font-size:18px;font-weight:700}
+
+    .status-list{display:grid;gap:10px}
+    .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      padding:13px 16px;
+      border-radius:14px;
+      background:var(--soft);
+      border:1px solid var(--line);
+      font-size:14px;
+    }
+    .row span:first-child{min-width:0;flex:1;word-break:break-word}
+    .right{font-weight:600;min-width:0;max-width:56%;text-align:right;word-break:break-word}
+
+    .note{
+      margin-top:12px;
+      padding:14px 16px;
+      border-radius:14px;
+      background:#faf3e4;
+      border:1px solid #e8d5ae;
+      color:#6b5018;
+      font-size:13px;
+      line-height:1.6;
+    }
+
+    .chart-shell{min-height:240px}
+    .chart-placeholder{
+      height:240px;
+      border-radius:18px;
+      background:var(--soft);
+      border:1px dashed var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .chart-shell.ready .chart-placeholder{display:none}
+    .chart-shell:not(.ready) canvas{display:none}
+
+    @media (max-width:820px){
+      .topbar{flex-direction:column;align-items:flex-start}
+      .hero-grid,.main-grid,.stats-two,.event{grid-template-columns:1fr}
+      .event-side{text-align:left}
+    }
+
+    .cal-nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px}
+    .cal-nav-btn{
+      border:0;
+      background:var(--soft);
+      color:var(--text);
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      font-size:18px;
+      font-weight:600;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:all .15s;
+      font-family:var(--font-heading);
+    }
+    .cal-nav-btn:hover{background:var(--brand);color:#fff}
+    .cal-month-label{font-family:var(--font-heading);font-size:15px;font-weight:700;min-width:100px;text-align:center}
+    .cal-today-btn{
+      border:1px solid var(--line);
+      background:var(--card);
+      color:var(--brand);
+      padding:5px 12px;
+      border-radius:10px;
+      font-size:12px;
+      font-weight:600;
+      cursor:pointer;
+      transition:all .15s;
+      font-family:var(--font-body);
+    }
+    .cal-today-btn:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
+    .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;text-align:center;font-size:11px;font-weight:600;color:var(--muted);padding:0 2px}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+    .cal-day{
+      aspect-ratio:1;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      border-radius:10px;
+      font-size:13px;
+      font-weight:500;
+      cursor:pointer;
+      transition:all .15s;
+      position:relative;
+      min-width:0;
+      background:transparent;
+      border:1px solid transparent;
+    }
+    .cal-day:hover{background:var(--soft);border-color:var(--line)}
+    .cal-day.other-month{color:#d5cfc4;cursor:default;pointer-events:none}
+    .cal-day.today{border:2px solid var(--brand);font-weight:700}
+    .cal-day.selected{background:var(--brand);color:#fff;font-weight:700}
+    .cal-day.selected .cal-dot{background:#fff}
+    .cal-day.has-events:not(.other-month){font-weight:600}
+    .cal-dot{width:5px;height:5px;border-radius:999px;background:var(--ok);margin-top:2px}
+    .cal-day.has-events:not(.other-month) .cal-dot{display:block}
+    .cal-day:not(.has-events) .cal-dot,.cal-day.other-month .cal-dot{display:none}
+    .cal-day.today .cal-dot{background:var(--brand)}
+    .cal-events{margin-top:14px;border-top:1px solid var(--line);padding-top:14px;display:none}
+    .cal-events.active{display:block}
+    .cal-events-header{font-family:var(--font-heading);font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px}
+    .cal-events .event{margin-bottom:10px}
+    .cal-events .event:last-child{margin-bottom:0}
+    .cal-empty{text-align:center;color:var(--muted);font-size:13px;padding:20px 0}
+    @media (max-width:640px){
+      .cal-day{font-size:11px;border-radius:8px}
+      .cal-dot{width:4px;height:4px}
+      .cal-nav-btn{width:28px;height:28px;font-size:16px}
+    }
+
+    .health-section{padding:14px 0;border-bottom:1px solid var(--line)}
+    .health-section:first-child{padding-top:0}
+    .health-section-label{font-family:var(--font-heading);font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
+    .health-indicators{display:flex;gap:14px;flex-wrap:wrap}
+    .health-ind{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500}
+    .health-dot{width:8px;height:8px;border-radius:999px;background:#d5cfc4;flex-shrink:0;transition:all .3s ease}
+    .health-dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(90,138,60,.15)}
+    .health-dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(199,118,46,.15)}
+    .health-sub{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.4}
+    .health-stats{display:flex;gap:8px 18px;flex-wrap:wrap;align-items:baseline}
+    .health-stat-num{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+    .health-stat-label{font-size:11px;color:var(--muted);display:block}
+    .health-stat-item{display:flex;flex-direction:column;gap:2px}
+    .health-verdict{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .health-verdict-tag{padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600}
+    .health-verdict-tag.ok{background:#edf7e8;color:#4a7530}
+    .health-verdict-tag.warn{background:#faf3e4;color:#8b5e24}
+    .health-verdict-tag.info{background:#f5ede0;color:#8b5e24}
+    .health-verdict-detail{font-size:12px;color:var(--muted)}
+    @media (max-width:640px){
+      .health-indicators{gap:8px}
+      .health-ind{font-size:11px}
+      .health-stat-num{font-size:18px}
+    }
+
+    .stat-merge{padding:18px 20px;min-height:90px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+    .merge-label{font-family:var(--font-heading);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.04em}
+    .merge-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+    .merge-today{font-size:14px;color:var(--text)}
+    .merge-today strong{font-size:24px;font-weight:700}
+    .merge-week{font-size:12px;color:var(--muted)}
+    .merge-week strong{font-size:15px;font-weight:600;color:var(--text)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="topbar">
+      <div>
+        <h1>猫咪饮水监控面板</h1>
+        <p>本地 NAS 分析程序接入后，自动汇总猫咪饮水事件、时长与预估饮水量。</p>
+      </div>
+      <div class="actions">
+        <div class="pill" id="modeBadge">实时监控中</div>
+        <div class="actions-main"><a class="btn primary" style="text-decoration:none;display:inline-flex;align-items:center" href="/push/">推送配置</a></div>
+        <div class="actions-secondary"><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/dev.html">开发者模式</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/settings/">设备设置</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/api/">API 契约</a></div>
+      </div>
+    </section>
+
+    <section class="grid hero-grid">
+      <div class="card hero" id="heroPanel"><video id="liveVideo" muted autoplay playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.94;display:none;background:#1a1814"></video><img id="livePreview" alt="实时预览" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.92;display:none"><div class="overlay"><div class="hero-header"><div class="hero-header-left"><div class="hero-tag" id="heroScopeTag">全画面监控</div><div class="live"><span class="dot"></span><span id="previewHealthChip">实时预览在线</span></div></div><div class="hero-header-right"><div class="chip" id="cameraSceneChip">饮水机监控</div><button class="mode-option inline-btn" id="fullscreenBtn" onclick="togglePreviewFullscreen()" type="button">全屏</button></div></div><div class="hero-bottom"><div class="hero-bottom-main"><h2>实时饮水区域视图</h2><div class="subtle" id="liveStatusText">稳定连续预览中</div></div><div class="chips"><span class="chip" id="previewModeChip">本地识别在线</span></div></div></div></div>
+      <div class="stats-two">
+        <div class="card stat-merge"><div class="merge-label">饮水次数</div><div class="merge-row"><span class="merge-today">今日 <strong id="drinkCount">0</strong></span><span class="merge-week">本周 <strong id="weekCount">0</strong></span></div></div>
+        <div class="card stat-merge"><div class="merge-label">预估饮水量</div><div class="merge-row"><span class="merge-today">今日 <strong id="waterMl">0</strong> ml</span><span class="merge-week">本周 <strong id="weekMl">0</strong> ml</span></div></div>
+        <div class="card stat-merge"><div class="merge-label">累计时长</div><div class="merge-row"><span class="merge-today">今日 <strong id="durationSec">0</strong> 秒</span><span class="merge-week">本周 <strong id="weekDuration">0</strong> 秒</span></div></div>
+        <div class="card stat-merge"><div class="merge-label">平均单次</div><div class="merge-row"><span class="merge-today" style="font-size:20px"><strong id="avgDuration">0</strong> 秒</span></div></div>
+      </div>
+    </section>
+
+    <section class="grid stats-grid">
+      <div class="card stat"><div><div class="label">最近一次饮水</div><div class="value" style="font-size:28px" id="lastDrink">--</div></div><div class="foot"><span id="lastDrinkAgo">等待猫咪饮水...</span><span class="subtle" id="catLastSeenFoot" style="font-size:11px"></span></div></div>
+      <div class="card stat"><div><div class="label">今日高峰时段</div><div class="value" style="font-size:22px" id="peakWindow">--</div></div><div class="foot"><span id="peakWindowHint">等待形成统计</span><span id="peakWindowCount" style="font-weight:700">--</span></div></div>
+      <div class="card stat"><div><div class="label">今日饮水评估</div><div class="value" style="font-size:28px" id="todayAssessment">--</div></div><div class="foot"><span id="todayAssessmentHint">等待统计生成</span><span id="todayAssessmentTag" style="font-size:12px;font-weight:700">--</span></div></div>
+      <div class="card stat"><div><div class="label">系统运行状态</div><div class="value" style="font-size:28px" id="systemStatus">检测中</div></div><div class="foot"><span id="systemStatusHint">检测器+摄像头</span><span id="systemStatusDots" style="font-size:11px">--</span></div></div>
+    </section>
+
+    <section class="grid main-grid">
+      <div class="grid">
+        <div class="card"><div class="inner"><div class="card-title"><h3>健康关注</h3><span class="subtle">实时识别结果和饮水统计汇总</span></div>
+          <div class="health-section" id="healthRealtime">
+            <div class="health-section-label">猫咪实时状态</div>
+            <div class="health-indicators">
+              <div class="health-ind"><span class="health-dot" id="dotCatVisible"></span><span>检测到猫</span></div>
+              <div class="health-ind"><span class="health-dot" id="dotCatNear"></span><span>靠近饮水机</span></div>
+              <div class="health-ind"><span class="health-dot" id="dotDrinking"></span><span>饮水进行中</span></div>
+            </div>
+            <div class="health-sub" id="healthRealtimeSub">等待检测数据...</div>
+          </div>
+          <div class="health-section" id="healthToday">
+            <div class="health-section-label">今日饮水摘要</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.5" id="healthTodayStats">--</div>
+          </div>
+          <div class="health-section" style="border-bottom:none" id="healthTrend">
+            <div class="health-section-label">饮水趋势对比</div>
+            <div class="health-verdict" id="healthVerdict">--</div>
+          </div>
+        </div></div>
+        <div class="card defer"><div class="inner"><div class="card-title"><h3>饮水趋势</h3><span class="subtle">最近 7 天 · 次数 / 预估饮水量</span></div><div class="chart-shell" id="chartShell"><div class="chart-placeholder">趋势图将在有真实饮水事件后自动生成。</div><canvas id="trendChart" height="240"></canvas></div><div class="note" id="trendNote">趋势数据由饮水事件自动聚合生成，每日更新。</div></div></div>
+        <div class="card defer"><div class="inner"><div class="card-title"><h3>最近饮水事件</h3><span class="subtle" id="calSubtitle">点击日期查看事件</span></div>
+  <div class="cal-nav">
+    <button class="cal-nav-btn" id="calPrev" title="上一月">&lsaquo;</button>
+    <span class="cal-month-label" id="calMonthLabel">2026年5月</span>
+    <button class="cal-nav-btn" id="calNext" title="下一月">&rsaquo;</button>
+    <button class="cal-today-btn" id="calToday">今天</button>
+  </div>
+  <div class="cal-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-events" id="calEvents"></div>
+</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card defer"><div class="inner"><div class="card-title"><h3>运行摘要</h3><span class="subtle">首页只展示关键结果，详细诊断请看开发者模式</span></div><div class="status-list product"><div class="row"><span>实时预览</span><span class="right" id="previewRuntimeState">连接中</span></div><div class="row"><span>检测器状态</span><span class="right" id="analyzerState">启动中</span></div><div class="row"><span>检测器 FPS</span><span class="right" id="detectorFps">--</span></div><div class="row"><span>猫检测 / 置信度</span><span class="right" id="catGateState">--</span></div><div class="row"><span>猫最后出现</span><span class="right" id="detectorCatLastSeen">--</span></div><div class="row"><span>饮水确认</span><span class="right" id="homeDrinkConfirmState">待确认</span></div><div class="row"><span>饮水持续</span><span class="right" id="detectorStreak">0.0s</span></div><div class="row"><span>最近识别更新</span><span class="right" id="detectorUpdatedAt">--</span></div><div class="row"><span>ROI 区域</span><span class="right" id="detectorRoi">--</span></div><div class="row"><span>NAS 负载 / 内存</span><span class="right" id="systemLoad">--</span></div><div class="row"><span>夜间模式</span><span class="right" id="nightModeState">--</span></div></div></div></div>
+      </div>
+    </section>
+  </div>
+
+<script>
+let chart = null;
+let chartReady = false;
+let pendingChartData = null;
+let chartScriptPromise = null;
+let hlsScriptPromise = null;
+let flvScriptPromise = null;
+let flvPlayer = null;
+let hlsPlayer = null;
+let liveStarted = false;
+let previewRefreshTimer = null;
+let liveRetryTimer = null;
+let _lastOverview = null;
+let _lastTrends = null;
+const previewMode = 'smooth';
+const heroPanel = document.getElementById('heroPanel');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const heroScopeTag = document.getElementById('heroScopeTag');
+const liveVideo = document.getElementById('liveVideo');
+const livePreview = document.getElementById('livePreview');
+const liveStatusText = document.getElementById('liveStatusText');
+const HLS_URL = '/api/live-hls.m3u8';
+const FLV_URL = '/api/live-preview.flv?mode=smooth';
+const MJPEG_URL = '/api/live.mjpeg?mode=smooth';
+const FLV_ENHANCE_TIMEOUT = 6000;
+const SNAPSHOT_URL = () => '/media/live/latest.jpg';
+const PLACEHOLDER_PREVIEW = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%232a2419'/%3E%3Cstop offset='1' stop-color='%23352e20'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1280' height='720' fill='url(%23g)'/%3E%3Ccircle cx='640' cy='300' r='96' fill='rgba(199,118,46,0.12)' stroke='rgba(199,118,46,0.28)' stroke-width='4'/%3E%3Cpath d='M590 252l-28-42-8 52M690 252l28-42 8 52' fill='none' stroke='rgba(245,239,224,0.82)' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='606' cy='298' r='8' fill='rgba(245,239,224,0.88)'/%3E%3Ccircle cx='674' cy='298' r='8' fill='rgba(245,239,224,0.88)'/%3E%3Cpath d='M620 330c12 12 28 12 40 0' fill='none' stroke='rgba(245,239,224,0.88)' stroke-width='8' stroke-linecap='round'/%3E%3Ctext x='640' y='470' fill='rgba(245,239,224,0.92)' font-size='42' text-anchor='middle' font-family='Georgia, Noto Serif SC, serif'%3E等待摄像头实时画面%3C/text%3E%3Ctext x='640' y='520' fill='rgba(155,140,125,0.92)' font-size='24' text-anchor='middle' font-family='PingFang SC, Microsoft YaHei, sans-serif'%3E当前将优先尝试直播链路，失败时回退到静态占位%3C/text%3E%3C/svg%3E";
+
+const EMPTY_DASHBOARD = {overview:{drinkCount:0,waterMl:0,durationSec:0,avgDuration:0,weekCount:0,weekMl:0,weekDuration:0,lastDrink:'--',lastDrinkAgo:'等待真实事件',healthMain:'等待真实事件',healthDesc:'实时识别和录像补检都已启动，正在等待第一批真实饮水事件。'},trends:{labels:[],counts:[],ml:[]},events:[]};
+
+function setText(id, value){
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function formatPhase(phase){
+  const map = {idle:'空闲',processing:'处理中',waiting_recordings:'等待录像',monitoring:'监控中',online:'在线',offline:'离线',ok:'正常',error:'异常'};
+  return map[phase] || phase || '--';
+}
+
+function clipName(path){
+  if (!path) return '--';
+  return String(path).split('/').filter(Boolean).pop() || path;
+}
+
+function renderOverview(data){
+  const overview = {...EMPTY_DASHBOARD.overview, ...(data || {})};
+  drinkCount.textContent = Number(overview.drinkCount || 0) > 0 ? overview.drinkCount : '—';
+  waterMl.textContent = Number(overview.waterMl || 0) > 0 ? overview.waterMl : '—';
+  durationSec.textContent = Number(overview.durationSec || 0) > 0 ? overview.durationSec : '—';
+  avgDuration.textContent = Number(overview.avgDuration || 0) > 0 ? overview.avgDuration : '—';
+  lastDrink.textContent = overview.lastDrink;
+  lastDrinkAgo.textContent = overview.lastDrinkAgo;
+  _lastOverview = overview;
+  setText('peakWindow', overview.peakHours || '暂无数据');
+  setText('peakWindowHint', overview.peakHoursCount > 0 ? '今日最活跃时段' : '等待形成统计');
+  setText('peakWindowCount', overview.peakHoursCount > 0 ? overview.peakHoursCount + '次' : '--');
+  var assessment = overview.todayAssessment || '监控中';
+  setText('todayAssessment', assessment);
+  var assessmentColors = {'饮水充足': 'var(--ok)', '饮水正常': 'var(--ok)', '饮水偏少': 'var(--warn)', '今日未饮水': 'var(--danger)'};
+  var todayAssessmentEl = document.getElementById('todayAssessment');
+  if (todayAssessmentEl) todayAssessmentEl.style.color = assessmentColors[assessment] || '';
+  setText('todayAssessmentHint', Number(overview.drinkCount || 0) > 0 ? '今日' + overview.drinkCount + '次，' + (overview.waterMl || 0) + 'ml' : '等待猫咪前来饮水');
+  setText('todayAssessmentTag', Number(overview.drinkCount || 0) > 0 ? '✨' : '');
+  weekCount.textContent = Number(overview.weekCount || 0) > 0 ? overview.weekCount : '—';
+  weekMl.textContent = Number(overview.weekMl || 0) > 0 ? overview.weekMl : '—';
+  weekDuration.textContent = Number(overview.weekDuration || 0) > 0 ? overview.weekDuration : '—';
+}
+
+function updateHealthPanel(detector){
+  const overview = _lastOverview || EMPTY_DASHBOARD.overview;
+  const trends = _lastTrends || EMPTY_DASHBOARD.trends;
+  const dotCatVisible = document.getElementById('dotCatVisible');
+  const dotCatNear = document.getElementById('dotCatNear');
+  const dotDrinking = document.getElementById('dotDrinking');
+  const healthRealtimeSub = document.getElementById('healthRealtimeSub');
+  if (dotCatVisible && dotCatNear && dotDrinking) {
+    if (detector) {
+      dotCatVisible.className = 'health-dot' + (detector.cat_visible ? ' on' : '');
+      dotCatNear.className = 'health-dot' + (detector.cat_near_fountain ? ' on' : (detector.cat_visible ? ' warn' : ''));
+      dotDrinking.className = 'health-dot' + (detector.drink_active ? ' on' : '');
+      var subParts = [];
+      if (detector.cat_visible && detector.cat_score) subParts.push('置信度 ' + detector.cat_score.toFixed(2));
+      if (detector.fps) subParts.push(detector.fps + 'fps 推理');
+      if (detector.night_mode) subParts.push('夜间模式');
+      if (detector.drink_active && detector.streak_sec) subParts.push('已持续 ' + detector.streak_sec + 's');
+      if (detector.last_drink_at) subParts.push('最近检测 ' + detector.last_drink_at.slice(11,19));
+      healthRealtimeSub.textContent = subParts.length ? subParts.join(' · ') : '暂无检测数据';
+    } else {
+      dotCatVisible.className = 'health-dot';
+      dotCatNear.className = 'health-dot';
+      dotDrinking.className = 'health-dot';
+      healthRealtimeSub.textContent = '等待检测数据...';
+    }
+  }
+  var healthTodayStats = document.getElementById('healthTodayStats');
+  if (healthTodayStats) {
+    var count = Number(overview.drinkCount || 0);
+    var ml = Number(overview.waterMl || 0);
+    var dur = Number(overview.durationSec || 0);
+    var avg = Number(overview.avgDuration || 0);
+    var assessment = overview.todayAssessment || '';
+    var assessmentTag = '';
+    if (assessment === '饮水充足') assessmentTag = '<span style="color:var(--ok);font-weight:700">✔ 饮水充足</span>';
+    else if (assessment === '饮水正常') assessmentTag = '<span style="color:var(--ok);font-weight:700">✔ 饮水正常</span>';
+    else if (assessment === '饮水偏少') assessmentTag = '<span style="color:var(--warn);font-weight:700">⚠ 饮水偏少</span>';
+    else if (assessment === '今日未饮水') assessmentTag = '<span style="color:var(--danger);font-weight:700">✗ 今日未饮水</span>';
+    if (count > 0) {
+      healthTodayStats.innerHTML = '今日饮水 <strong>' + count + '</strong> 次，共 <strong>' + ml + '</strong> ml，平均 <strong>' + avg + '</strong> 秒/次 — ' + assessmentTag;
+    } else {
+      healthTodayStats.innerHTML = '<span style="font-size:13px;color:var(--muted)">今日暂无饮水记录，等待猫咪前来饮水。</span>';
+    }
+  }
+  var verdictEl = document.getElementById('healthVerdict');
+  if (verdictEl) {
+    var healthMain = overview.healthMain || '监控中';
+    var tagClass = 'info';
+    if (healthMain === '饮水正常' || healthMain === '少量活动') tagClass = 'ok';
+    else if (healthMain === '频繁饮水') tagClass = 'warn';
+    var labels = trends.labels || [];
+    var counts = trends.counts || [];
+    var trendText = '';
+    if (labels.length >= 2) {
+      var today = new Date();
+      var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+      var dayBefore = new Date(today); dayBefore.setDate(dayBefore.getDate() - 2);
+      var yStr = String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
+      var dbStr = String(dayBefore.getMonth() + 1).padStart(2, '0') + '-' + String(dayBefore.getDate()).padStart(2, '0');
+      var yIdx = labels.indexOf(yStr);
+      var dbIdx = labels.indexOf(dbStr);
+      var parts = ['今日 ' + count + ' 次'];
+      if (yIdx >= 0) {
+        var diff = count - counts[yIdx];
+        var arrow = diff > 0 ? ' ↑' : diff < 0 ? ' ↓' : ' →';
+        parts.push('昨日 ' + counts[yIdx] + ' 次' + arrow + Math.abs(diff));
+      }
+      if (dbIdx >= 0) parts.push('前日 ' + counts[dbIdx] + ' 次');
+      trendText = parts.join(' · ');
+    } else if (overview.drinkCount > 0) {
+      trendText = '今日 ' + overview.drinkCount + ' 次饮水事件';
+    } else {
+      trendText = '暂无趋势数据';
+    }
+    verdictEl.innerHTML = '<span class="health-verdict-tag ' + tagClass + '">' + healthMain + '</span><span class="health-verdict-detail">' + trendText + '</span>';
+  }
+}
+
+function scheduleHeroImage(){
+  heroPanel.style.backgroundImage = 'linear-gradient(180deg,rgba(42,36,25,.95),rgba(42,36,25,.70)), url(' + PLACEHOLDER_PREVIEW + ')';
+  heroPanel.dataset.loaded = heroPanel.dataset.loaded || '0';
+}
+
+function showStaticPlaceholder(message){
+  heroPanel.style.backgroundImage = 'linear-gradient(180deg,rgba(42,36,25,.95),rgba(42,36,25,.70)), url(' + PLACEHOLDER_PREVIEW + ')';
+  livePreview.src = PLACEHOLDER_PREVIEW;
+  livePreview.style.display = 'block';
+  liveVideo.style.display = 'none';
+  heroPanel.dataset.loaded = '1';
+  liveStarted = false;
+  if (message) liveStatusText.textContent = message;
+}
+
+async function loadCameraPreview(){
+  if (liveStarted) return;
+  let status = null;
+  try {
+    status = await fetch('/api/camera-status').then(res => res.json());
+  } catch (_) {}
+  if (!livePreview.dataset.mjpegBound) {
+    livePreview.dataset.mjpegBound = '1';
+    livePreview.onerror = () => {
+      livePreview.dataset.mjpegFailed = '1';
+      if (status && status.snapshot) {
+        livePreview.src = SNAPSHOT_URL() + '?ts=' + Date.now();
+        liveStatusText.textContent = '连续预览暂不可用，已回退到当前快照。';
+      } else {
+        showStaticPlaceholder('摄像头快照暂不可用，已显示静态占位图。');
+      }
+    };
+  }
+  if (livePreview.dataset.mjpegFailed !== '1') {
+    const target = MJPEG_URL;
+    if (livePreview.src !== target) {
+      livePreview.src = target;
+    }
+    livePreview.style.display = 'block';
+    livePreview.onload = () => { heroPanel.dataset.loaded = '1'; liveStatusText.textContent = '稳定连续预览中'; };
+    liveStatusText.textContent = '正在连接稳定预览链路，若失败会自动回退。';
+    return;
+  }
+  if (status && status.snapshot) {
+    livePreview.src = SNAPSHOT_URL() + '?ts=' + Date.now();
+    livePreview.style.display = 'block';
+    heroPanel.dataset.loaded = '1';
+    liveStatusText.textContent = status.ok ? '流畅模式连续流不可用，已回退到当前快照。' : '摄像头快照可用，实时流暂未恢复。';
+    return;
+  }
+  showStaticPlaceholder('当前暂无可用实时预览，已切换到静态占位图。');
+  if (heroScopeTag && !heroScopeTag.textContent) heroScopeTag.textContent = '全画面监控';
+}
+
+function startPreviewRefresh(interval = 1000){
+  if (previewRefreshTimer) return;
+  previewRefreshTimer = setInterval(() => {
+    if (!liveStarted) loadCameraPreview();
+  }, interval);
+}
+
+function stopPreviewRefresh(){
+  if (!previewRefreshTimer) return;
+  clearInterval(previewRefreshTimer);
+  previewRefreshTimer = null;
+}
+
+function scheduleLiveRetry(interval = 12000){
+  if (liveRetryTimer) return;
+  liveRetryTimer = setInterval(() => {
+    if (!liveStarted) startLivePreview();
+  }, interval);
+}
+
+function stopLiveRetry(){
+  if (!liveRetryTimer) return;
+  clearInterval(liveRetryTimer);
+  liveRetryTimer = null;
+}
+
+function isPreviewFullscreen(){
+  return document.fullscreenElement === heroPanel || document.webkitFullscreenElement === heroPanel;
+}
+
+async function exitPreviewFullscreen(){
+  if (document.exitFullscreen) { await document.exitFullscreen(); return; }
+  if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+}
+
+async function requestPreviewFullscreen(target){
+  if (target.requestFullscreen) { await target.requestFullscreen(); return true; }
+  if (target.webkitRequestFullscreen) { target.webkitRequestFullscreen(); return true; }
+  if (liveVideo && liveVideo.webkitEnterFullscreen && liveVideo.style.display !== 'none') {
+    liveVideo.webkitEnterFullscreen(); return true;
+  }
+  return false;
+}
+
+async function togglePreviewFullscreen(){
+  const target = heroPanel;
+  try {
+    if (isPreviewFullscreen()) { await exitPreviewFullscreen(); return; }
+    const ok = await requestPreviewFullscreen(target);
+    if (!ok && fullscreenBtn) {
+      fullscreenBtn.textContent = '浏览器不支持';
+      setTimeout(() => { fullscreenBtn.textContent = isPreviewFullscreen() ? '退出全屏' : '全屏'; }, 1600);
+    }
+  } catch (_) {}
+}
+
+function syncFullscreenButton(){
+  const active = isPreviewFullscreen();
+  if (typeof fullscreenBtn !== 'undefined' && fullscreenBtn) {
+    fullscreenBtn.textContent = active ? '退出全屏' : '全屏';
+  }
+}
+
+document.addEventListener('fullscreenchange', syncFullscreenButton);
+document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
+
+function ensureFlvScript(){
+  if (window.flvjs) return Promise.resolve();
+  if (flvScriptPromise) return flvScriptPromise;
+  flvScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/flv.js@latest/dist/flv.min.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return flvScriptPromise;
+}
+
+function ensureHlsScript(){
+  if (window.Hls) return Promise.resolve();
+  if (hlsScriptPromise) return hlsScriptPromise;
+  hlsScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return hlsScriptPromise;
+}
+
+function showLiveVideo(message){
+  stopPreviewRefresh();
+  stopLiveRetry();
+  liveVideo.style.display = 'block';
+  livePreview.style.display = 'none';
+  liveStarted = true;
+  heroPanel.dataset.loaded = '1';
+  liveStatusText.textContent = message;
+}
+
+function showPreviewFallback(message){
+  liveVideo.style.display = 'none';
+  livePreview.style.display = livePreview.src ? 'block' : 'none';
+  liveStarted = false;
+  heroPanel.dataset.loaded = livePreview.src ? '1' : '0';
+  if (message) liveStatusText.textContent = message;
+  startPreviewRefresh(1000);
+  scheduleLiveRetry(12000);
+}
+
+async function waitForFirstVideoFrame(timeout = 15000){
+  if (liveVideo.readyState >= 2 && liveVideo.videoWidth > 0) return true;
+  return await new Promise(resolve => {
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      liveVideo.removeEventListener('loadeddata', onReady);
+      liveVideo.removeEventListener('playing', onReady);
+      liveVideo.removeEventListener('canplay', onReady);
+      clearTimeout(timer);
+      resolve(ok);
+    };
+    const onReady = () => finish(liveVideo.readyState >= 2 && liveVideo.videoWidth > 0);
+    const timer = setTimeout(() => finish(false), timeout);
+    liveVideo.addEventListener('loadeddata', onReady, { once: true });
+    liveVideo.addEventListener('playing', onReady, { once: true });
+    liveVideo.addEventListener('canplay', onReady, { once: true });
+  });
+}
+
+async function startHlsPreview(){
+  if (liveVideo.canPlayType('application/vnd.apple.mpegurl')) {
+    liveVideo.src = HLS_URL;
+    try {
+      await liveVideo.play();
+      const ready = await waitForFirstVideoFrame();
+      if (!ready) { showPreviewFallback('HLS 已连接，但未拿到视频首帧，已显示最新快照。'); return false; }
+      showLiveVideo('实时视频预览中 · HLS 低延迟直播');
+      return true;
+    } catch (_) {
+      showPreviewFallback('HLS 已连接，但浏览器未开始播放，已显示最新快照。');
+      return false;
+    }
+  }
+  await ensureHlsScript();
+  if (!window.Hls || !window.Hls.isSupported()) return false;
+  return await new Promise(resolve => {
+    let settled = false;
+    const finish = (ok) => { if (settled) return; settled = true; resolve(ok); };
+    hlsPlayer = new window.Hls({
+      lowLatencyMode: true,
+      liveSyncDurationCount: 1,
+      liveMaxLatencyDurationCount: 3,
+      maxLiveSyncPlaybackRate: 1.5,
+      enableWorker: true,
+      backBufferLength: 10,
+    });
+    hlsPlayer.loadSource(HLS_URL);
+    hlsPlayer.attachMedia(liveVideo);
+    hlsPlayer.on(window.Hls.Events.MANIFEST_PARSED, async () => {
+      try {
+        await liveVideo.play();
+        const ready = await waitForFirstVideoFrame();
+        if (!ready) { try { hlsPlayer.destroy(); } catch (_) {} hlsPlayer = null; finish(false); return; }
+        showLiveVideo('实时视频预览中 · HLS 低延迟直播');
+        finish(true);
+      } catch (_) { try { hlsPlayer.destroy(); } catch (_) {} hlsPlayer = null; finish(false); }
+    });
+    hlsPlayer.on(window.Hls.Events.ERROR, (_, data) => {
+      if (!data || !data.fatal) return;
+      try { hlsPlayer.destroy(); } catch (_) {}
+      hlsPlayer = null;
+      showPreviewFallback('HLS 实时视频不可用，已回退到最新快照。');
+      finish(false);
+    });
+    setTimeout(() => {
+      if (settled) return;
+      try { hlsPlayer.destroy(); } catch (_) {}
+      hlsPlayer = null;
+      showPreviewFallback('HLS 连接超时，已显示最新快照。');
+      finish(false);
+    }, 5000);
+  });
+}
+
+async function startFlvPreview(){
+  try {
+    await ensureFlvScript();
+    if (!window.flvjs || !window.flvjs.isSupported()) {
+      liveStatusText.textContent = '浏览器不支持 FLV，已回退到快照预览。';
+      return loadCameraPreview();
+    }
+    if (flvPlayer) return;
+    flvPlayer = window.flvjs.createPlayer({ type: 'flv', isLive: true, url: FLV_URL, hasAudio: false, hasVideo: true }, {
+      enableStashBuffer: true,
+      stashInitialSize: 512,
+      stashBufferSize: 1024,
+      lazyLoad: false,
+      autoCleanupSourceBuffer: true,
+      autoCleanupMaxDuration: 60,
+      fixAudioTimestampGap: false
+    });
+    flvPlayer.attachMediaElement(liveVideo);
+    flvPlayer.load();
+    liveVideo.onstalled = function() { try { liveVideo.play().catch(function() {}); } catch (_) {} };
+    liveVideo.onwaiting = function() {
+      setTimeout(function() {
+        if (liveVideo.paused && liveStarted && liveVideo.style.display !== 'none') {
+          try { liveVideo.play().catch(function() {}); } catch (_) {}
+        }
+      }, 2000);
+    };
+    try {
+      await liveVideo.play();
+      const ready = await waitForFirstVideoFrame();
+      if (!ready) { try { flvPlayer.destroy(); } catch (_) {} flvPlayer = null; showPreviewFallback('低延迟直播未拿到首帧，已保持稳定预览。'); return loadCameraPreview(); }
+      showLiveVideo('实时摄像头画面已切换到低延迟直播');
+    } catch (_) { try { flvPlayer.destroy(); } catch (_) {} flvPlayer = null; showPreviewFallback('浏览器未开始播放低延迟直播，已保持稳定预览。'); return loadCameraPreview(); }
+    flvPlayer.on(window.flvjs.Events.ERROR, () => {
+      showPreviewFallback('低延迟直播异常，已保持稳定预览。');
+      try { flvPlayer.destroy(); } catch (_) {}
+      flvPlayer = null;
+      loadCameraPreview();
+    });
+    flvPlayer.on(window.flvjs.Events.STATISTICS_INFO, function() {
+      if (liveVideo.paused && liveStarted && liveVideo.style.display !== 'none') {
+        try { liveVideo.play().catch(function() {}); } catch (_) {}
+      }
+    });
+  } catch (_) {
+    showPreviewFallback('低延迟直播连接失败，已保持稳定预览。');
+    loadCameraPreview();
+  }
+}
+
+async function tryEnhanceFlvPreview(){
+  try {
+    await Promise.race([
+      startFlvPreview(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('flv timeout')), FLV_ENHANCE_TIMEOUT))
+    ]);
+  } catch (_) {}
+}
+
+async function startLivePreview(){
+  if (liveStarted) return;
+  showStaticPlaceholder('正在连接实时摄像头画面，连接成功后会自动切换到预览。');
+  await loadCameraPreview();
+  tryEnhanceFlvPreview();
+}
+
+function getThumbUrl(url){
+  if (!url) return '';
+  try {
+    const parsed = new URL(url, location.origin);
+    if (parsed.hostname.includes('images.unsplash.com')) {
+      parsed.searchParams.set('w', '168');
+      parsed.searchParams.set('q', '60');
+      parsed.searchParams.set('auto', 'format');
+      parsed.searchParams.set('fit', 'crop');
+    }
+    return parsed.toString();
+  } catch (_) { return url; }
+}
+
+function renderEvents(events) {
+  calEventsData = Array.isArray(events) ? events : [];
+  var today = new Date();
+  if (calYear === undefined) { calYear = today.getFullYear(); calMonth = today.getMonth(); }
+  buildCalendar(calYear, calMonth);
+  if (calSelectedDate) {
+    var byDate = groupEventsByDate(calEventsData);
+    if (!byDate[calSelectedDate] || !byDate[calSelectedDate].length) {
+      calSelectedDate = null;
+      var panel = document.getElementById('calEvents');
+      if (panel) panel.classList.remove('active');
+      var subtitle = document.getElementById('calSubtitle');
+      if (subtitle) subtitle.textContent = '点击日期查看事件';
+    } else { renderDayEvents(calSelectedDate); }
+  }
+}
+
+var calYear, calMonth, calSelectedDate = null;
+var calEventsData = [];
+
+function groupEventsByDate(events) {
+  var map = {};
+  (events || []).forEach(function(evt) {
+    var ts = evt.start_time || '';
+    if (ts && ts.indexOf('T') >= 0) {
+      var date = ts.split('T')[0];
+      if (!map[date]) map[date] = [];
+      map[date].push(evt);
+    }
+  });
+  return map;
+}
+
+function buildCalendar(year, month) {
+  calYear = year; calMonth = month;
+  var grid = document.getElementById('calGrid');
+  var label = document.getElementById('calMonthLabel');
+  if (!grid || !label) return;
+  label.textContent = year + '年' + (month + 1) + '月';
+  var today = new Date();
+  var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  var byDate = groupEventsByDate(calEventsData);
+  var firstDay = new Date(year, month, 1).getDay();
+  var daysInMonth = new Date(year, month+1, 0).getDate();
+  var daysInPrev = new Date(year, month, 0).getDate();
+  var startCol = firstDay === 0 ? 6 : firstDay - 1;
+  var html = '';
+  for (var i = startCol - 1; i >= 0; i--) {
+    var d = daysInPrev - i;
+    html += '<div class="cal-day other-month">' + d + '<span class="cal-dot"></span></div>';
+  }
+  for (var d = 1; d <= daysInMonth; d++) {
+    var ds = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var hasEvt = !!byDate[ds];
+    var cls = 'cal-day';
+    if (hasEvt) cls += ' has-events';
+    if (ds === todayStr) cls += ' today';
+    if (ds === calSelectedDate) cls += ' selected';
+    html += '<div class="' + cls + '" data-date="' + ds + '">' + d + '<span class="cal-dot"></span></div>';
+  }
+  var totalCells = startCol + daysInMonth;
+  var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (var d = 1; d <= remaining; d++) {
+    html += '<div class="cal-day other-month">' + d + '<span class="cal-dot"></span></div>';
+  }
+  grid.innerHTML = html;
+  if (calSelectedDate) renderDayEvents(calSelectedDate);
+}
+
+function selectDate(dateStr) {
+  calSelectedDate = dateStr;
+  var allDays = document.querySelectorAll('.cal-day');
+  for (var i = 0; i < allDays.length; i++) {
+    allDays[i].classList.toggle('selected', allDays[i].getAttribute('data-date') === dateStr);
+  }
+  renderDayEvents(dateStr);
+}
+
+function renderDayEvents(dateStr) {
+  var panel = document.getElementById('calEvents');
+  var subtitle = document.getElementById('calSubtitle');
+  if (!panel) return;
+  var byDate = groupEventsByDate(calEventsData);
+  var dayEvents = byDate[dateStr] || [];
+  if (!dayEvents.length) { panel.classList.remove('active'); if (subtitle) subtitle.textContent = '点击日期查看事件'; return; }
+  panel.classList.add('active');
+  var cnt = dayEvents.length;
+  if (subtitle) subtitle.textContent = dateStr + ' · ' + cnt + ' 次饮水';
+  panel.innerHTML = '<div class="cal-events-header">共 ' + cnt + ' 次饮水事件</div>' + dayEvents.map(function(evt) {
+    return '<div class="event"><div class="thumb"><img src="' + getThumbUrl(evt.img) + '" width="84" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer"></div><div><strong><a href="/events/?id=' + evt.id + '" style="color:#2c2416;text-decoration:none">' + evt.title + '</a></strong><span>' + evt.desc + '</span></div><div class="event-side"><div class="big">' + evt.metric + '</div><div class="subtle">' + evt.tag + '</div></div></div>';
+  }).join('');
+}
+
+function calPrevMonth() {
+  if (calMonth === 0) { calYear--; calMonth = 11; } else calMonth--;
+  buildCalendar(calYear, calMonth);
+}
+function calNextMonth() {
+  if (calMonth === 11) { calYear++; calMonth = 0; } else calMonth++;
+  buildCalendar(calYear, calMonth);
+}
+function calGoToday() {
+  var today = new Date();
+  calYear = today.getFullYear(); calMonth = today.getMonth();
+  buildCalendar(calYear, calMonth);
+}
+
+(function() {
+  document.addEventListener('click', function(e) {
+    var day = e.target.closest ? e.target.closest('.cal-day') : null;
+    if (day && !day.classList.contains('other-month')) { selectDate(day.getAttribute('data-date')); }
+  });
+  function bindCalNav() {
+    var prev = document.getElementById('calPrev');
+    var next = document.getElementById('calNext');
+    var todayBtn = document.getElementById('calToday');
+    if (prev) prev.onclick = calPrevMonth;
+    if (next) next.onclick = calNextMonth;
+    if (todayBtn) todayBtn.onclick = calGoToday;
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', bindCalNav); }
+  else { bindCalNav(); }
+})();
+
+function ensureChartScript(){
+  if (window.Chart) return Promise.resolve();
+  if (chartScriptPromise) return chartScriptPromise;
+  chartScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  return chartScriptPromise;
+}
+
+function drawChart(){
+  if (!chartReady || !pendingChartData || !window.Chart) return;
+  chartShell.classList.add('ready');
+  if (chart) { chart.data = pendingChartData; chart.update('none'); return; }
+  chart = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: pendingChartData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+      plugins: { legend: { labels: { color: '#5c4f3a', font: { family: "'Inter','PingFang SC','Microsoft YaHei',sans-serif" } } } },
+      scales: {
+        x: { ticks: { color: '#9b8c7d' }, grid: { color: 'rgba(44,36,22,0.06)' } },
+        y: { ticks: { color: '#9b8c7d' }, grid: { color: 'rgba(44,36,22,0.06)' } }
+      }
+    }
+  });
+}
+
+function renderChart(trends){
+  const chartData = trends && Array.isArray(trends.labels) ? trends : EMPTY_DASHBOARD.trends;
+  const noteEl = document.getElementById('trendNote');
+  if (!chartData.labels.length) {
+    if (noteEl) noteEl.textContent = '当前尚未形成真实统计数据，待检测到饮水事件后自动生成趋势。';
+  } else {
+    const totalCount = (Array.isArray(chartData.counts) ? chartData.counts : []).reduce((a, b) => a + (b || 0), 0);
+    const mlSum = (Array.isArray(chartData.ml) ? chartData.ml : []).reduce((a, b) => a + (b || 0), 0);
+    if (noteEl) noteEl.textContent = '已统计 ' + chartData.labels.length + ' 天共 ' + totalCount + ' 次饮水事件，累计预估 ' + mlSum + 'ml 饮水量。';
+  }
+  _lastTrends = chartData;
+  pendingChartData = {
+    labels: chartData.labels,
+    datasets: [
+      { label: '喝水次数', data: chartData.counts, borderColor: '#c7762e', backgroundColor: 'rgba(199,118,46,.15)', tension: .35, fill: false, pointRadius: 3 },
+      { label: '预估饮水量(ml)', data: chartData.ml, borderColor: '#5a8a3c', backgroundColor: 'rgba(90,138,60,.15)', tension: .35, fill: false, pointRadius: 3 }
+    ]
+  };
+  drawChart();
+}
+
+async function enableChart(){
+  if (chartReady) return;
+  chartReady = true;
+  try { await ensureChartScript(); drawChart(); }
+  catch (_) { chartShell.querySelector('.chart-placeholder').textContent = '趋势图加载失败，但不影响页面使用。'; }
+}
+
+function setupDeferredChart(){
+  setTimeout(function() { enableChart(); }, 500);
+}
+
+async function updateRuntimeStatus(settings, push){
+  const setLevel = (el, level) => {
+    if (!el) return;
+    el.style.color = level === 'danger' ? 'var(--danger)' : level === 'warn' ? 'var(--warn)' : level === 'ok' ? 'var(--ok)' : '';
+  };
+  if (settings) {
+    analyzerState.textContent = settings.cameraName ? '已配置' : '启动中';
+    setText('cameraSceneChip', (settings.cameraName || 'cam-01') + ' · 饮水机监控');
+  }
+  try {
+    const detector = await fetch('/api/detector-status').then(res => res.ok ? res.json() : null);
+    if (detector) {
+      analyzerState.textContent = detector.ok ? '监控中 (FPS ' + (detector.fps||0) + ')' : (detector.phase || '未启动');
+      setText('homeDrinkConfirmState', detector.drink_active ? '饮水进行中' : (detector.cat_visible ? '猫在画面中' : '未触发'));
+      detectorFps.textContent = detector.fps ? detector.fps + 'fps' : '--';
+      catGateState.textContent = detector.cat_visible ? '检测到猫 / ' + (detector.cat_score||0).toFixed(2) : '未检测到';
+      detectorRoi.textContent = '全帧+YOLO检测';
+      setText('detectorStreak', detector.streak_sec ? detector.streak_sec + 's' : '0.0s');
+      setText('detectorUpdatedAt', detector.updated_at ? detector.updated_at.slice(11,19) : '--');
+      setText('nightModeState', detector.night_mode ? '开启 (IR)' : '关闭 (日间)');
+      if (detector.cat_last_seen_at) {
+        var seenTime = new Date(detector.cat_last_seen_at.replace(' ', 'T'));
+        var diffSec = Math.max(0, (Date.now() - seenTime.getTime()) / 1000);
+        var seenText = diffSec < 60 ? '刚刚' : diffSec < 3600 ? Math.floor(diffSec/60) + '分钟前' : Math.floor(diffSec/3600) + '小时前';
+        setText('detectorCatLastSeen', seenText);
+        setText('catLastSeenFoot', '猫最后出现: ' + seenText);
+      } else {
+        setText('detectorCatLastSeen', '尚无记录');
+        setText('catLastSeenFoot', '');
+      }
+      setLevel(catGateState, detector.cat_visible ? (detector.cat_score >= 0.5 ? 'ok' : 'warn') : '');
+      setLevel(homeDrinkConfirmState, detector.drink_active ? 'ok' : (detector.cat_visible ? 'warn' : ''));
+      updateHealthPanel(detector);
+      var heroH2 = document.querySelector('.hero-bottom h2');
+      var heroSubtle = document.querySelector('.hero-bottom .subtle');
+      if (heroH2 && heroSubtle) {
+        if (detector.drink_active) {
+          heroH2.textContent = '🐱 猫咪正在饮水';
+          heroSubtle.textContent = '已持续 ' + (detector.streak_sec||0).toFixed(1) + 's · 置信度 ' + (detector.cat_score||0).toFixed(2);
+        } else if (detector.cat_visible) {
+          heroH2.textContent = '实时饮水区域视图';
+          heroSubtle.textContent = '检测到猫咪 · 置信度 ' + (detector.cat_score||0).toFixed(2) + ' · ' + (detector.cat_near_fountain ? '靠近饮水机' : '在画面中');
+        } else {
+          heroH2.textContent = '实时饮水区域视图';
+          heroSubtle.textContent = '摄像头在线 · 检测器运行中 · 等待猫咪出现';
+        }
+      }
+    }
+  } catch (_) {}
+  try {
+    const metrics = await fetch('/api/system-metrics').then(res => res.ok ? res.json() : null);
+    if (metrics && metrics.host) {
+      const load = metrics.host.loadavg || {};
+      const memory = metrics.host.memory || {};
+      const loadText = (load['1m'] || '--') + ' / ' + (memory.percent || '--') + '%';
+      setText('systemLoad', loadText);
+    }
+  } catch (_) {}
+  try {
+    const camera = await fetch('/api/camera-status').then(res => res.ok ? res.json() : null);
+    if (camera) {
+      setText('previewRuntimeState', camera.ok ? '预览正常' : '预览异常');
+      setLevel(previewRuntimeState, camera.ok ? 'ok' : 'warn');
+    }
+    var detectorOk = document.getElementById('analyzerState').textContent.indexOf('监控中') >= 0;
+    var cameraOk = camera ? camera.ok : false;
+    var sysEl = document.getElementById('systemStatus');
+    var sysHintEl = document.getElementById('systemStatusHint');
+    var sysDotsEl = document.getElementById('systemStatusDots');
+    if (sysEl && sysHintEl && sysDotsEl) {
+      if (detectorOk && cameraOk) {
+        sysEl.textContent = '运行正常'; sysEl.style.color = 'var(--ok)';
+        sysHintEl.textContent = '检测器 ✓  摄像头 ✓';
+        sysDotsEl.innerHTML = '<span style="color:var(--ok)">● 全部在线</span>';
+      } else if (detectorOk || cameraOk) {
+        sysEl.textContent = '部分异常'; sysEl.style.color = 'var(--warn)';
+        sysHintEl.textContent = (detectorOk ? '检测器 ✓  ' : '检测器 ✗  ') + (cameraOk ? '摄像头 ✓' : '摄像头 ✗');
+        sysDotsEl.innerHTML = '<span style="color:var(--warn)">● 注意</span>';
+      } else {
+        sysEl.textContent = '系统离线'; sysEl.style.color = 'var(--danger)';
+        sysHintEl.textContent = '检测器 ✗  摄像头 ✗';
+        sysDotsEl.innerHTML = '<span style="color:var(--danger)">● 全部离线</span>';
+      }
+    }
+  } catch (_) {}
+}
+
+async function loadApi(){
+  modeBadge.textContent = '实时监控中';
+  analyzerState.textContent = '尝试连接';
+  try {
+    const [dashboardRes, settingsRes, pushRes] = await Promise.all([
+      fetch('/api/dashboard/overview'),
+      fetch('/api/settings'),
+      fetch('/api/push-settings')
+    ]);
+    if (!dashboardRes.ok) throw new Error('API未就绪');
+    const data = await dashboardRes.json();
+    renderOverview(data.overview || EMPTY_DASHBOARD.overview);
+    renderEvents(data.events || EMPTY_DASHBOARD.events);
+    renderChart(data.trends || EMPTY_DASHBOARD.trends);
+    enableChart();
+    const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+    await updateRuntimeStatus(settingsData, pushRes.ok ? await pushRes.json() : null);
+    analyzerState.textContent = '已接入';
+  } catch (_) {
+    renderOverview(EMPTY_DASHBOARD.overview);
+    renderEvents(EMPTY_DASHBOARD.events);
+    renderChart(EMPTY_DASHBOARD.trends);
+    updateHealthPanel(null);
+    modeBadge.textContent = '实时监控中';
+    analyzerState.textContent = '等待接口';
+  }
+}
+
+setupDeferredChart();
+scheduleHeroImage();
+startLivePreview();
+startPreviewRefresh(1000);
+scheduleLiveRetry(12000);
+loadApi();
+setInterval(loadApi, 15000);
+</script>
+</body>
+</html>

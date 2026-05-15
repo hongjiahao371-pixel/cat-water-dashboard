@@ -1,0 +1,117 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>饮水事件详情</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--ok:#7aaa54;--warn:#d4924a;--err:#d4735e;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.back{color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);font-family:var(--font-body);transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}.inner{padding:20px}.hero{height:420px;background:#1a1814 center/cover no-repeat;position:relative}.hero:after{content:'事件截图';position:absolute;left:18px;top:18px;padding:8px 14px;border-radius:999px;background:rgba(122,170,84,.12);border:1px solid rgba(122,170,84,.20);color:var(--ok);font-size:12px;font-weight:600;font-family:var(--font-heading)}.meta{display:grid;gap:12px}.row{display:flex;justify-content:space-between;gap:16px;padding:14px 16px;border-radius:16px;background:rgba(245,239,224,.03);border:1px solid rgba(245,239,224,.05)}.label{color:var(--muted)}.big{font-size:22px;font-weight:700}video{width:100%;border-radius:18px;background:#000}p{line-height:1.7;color:#d5cfc4}h3{font-family:var(--font-heading)}.label-section{margin-top:18px;padding:18px;border-radius:18px;background:rgba(212,146,74,.08);border:1px solid rgba(212,146,74,.14);display:flex;flex-direction:column;gap:14px}.label-section h4{margin:0;font-size:15px;color:var(--muted);font-weight:600}.label-actions{display:flex;gap:12px}.btn-label{border:none;border-radius:14px;padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font-body)}.btn-label:active{transform:scale(.97)}.btn-confirm{background:rgba(122,170,84,.18);border:1.5px solid rgba(122,170,84,.35);color:var(--ok)}.btn-confirm:hover{background:rgba(122,170,84,.28)}.btn-misreport{background:rgba(212,115,94,.14);border:1.5px solid rgba(212,115,94,.30);color:var(--err)}.btn-misreport:hover{background:rgba(212,115,94,.24)}.btn-label:disabled{opacity:.4;cursor:not-allowed;transform:none}.label-status{padding:12px 16px;border-radius:14px;font-weight:600;font-size:15px;text-align:center}.label-status.confirmed{background:rgba(122,170,84,.14);border:1px solid rgba(122,170,84,.25);color:var(--ok)}.label-status.false_positive{background:rgba(212,115,94,.12);border:1px solid rgba(212,115,94,.22);color:var(--err)}.label-change{font-size:12px;font-weight:400;margin-left:8px;color:var(--muted);cursor:pointer;text-decoration:underline}.label-stats{font-size:13px;color:var(--muted);line-height:1.7}.label-stats strong{color:var(--text)}.label-stats .ready{color:var(--ok);font-weight:600}@media(max-width:900px){.grid{grid-template-columns:1fr}.label-actions{flex-direction:column}}</style></head><body><div class="wrap"><div class="top"><a class="back" href="/">← 返回面板</a><div id="title" style="font-size:28px;font-weight:700;font-family:var(--font-heading)">饮水事件详情</div></div><div class="grid"><div class="card"><div class="hero" id="hero"></div><div class="inner"><h3 style="margin:0 0 10px">事件摘要</h3><p id="summary"></p><h3 style="margin:18px 0 10px">事件回放</h3><video id="video" controls poster=""><source id="videoSource" src="" type="video/mp4"></video><p id="videoHint" style="color:var(--muted);font-size:13px">当前无可播放片段，后续可接 NAS 本地事件视频地址。</p></div></div><div class="card"><div class="inner"><h3 style="margin-top:0">事件指标</h3><div class="meta"><div class="row"><span class="label">时间范围</span><strong id="timeRange"></strong></div><div class="row"><span class="label">持续时长</span><strong id="duration"></strong></div><div class="row"><span class="label">置信度</span><strong id="confidence"></strong></div><div class="row"><span class="label">预估饮水量</span><strong id="estimatedMl"></strong></div><div class="row"><span class="label">事件标签</span><strong id="tag"></strong></div></div><div class="label-section"><h4>人工复核</h4><div id="labelActions" class="label-actions"><button class="btn-label btn-confirm" onclick="submitLabel('confirmed')">确认饮水 ✓</button><button class="btn-label btn-misreport" onclick="submitLabel('false_positive')">标记误报 ✗</button></div><div id="labelStatus" class="label-status" style="display:none"></div><div id="labelStats" class="label-stats">加载标注统计...</div></div></div></div></div></div><script>
+let currentEventId = null;
+
+async function loadEvents(){
+  try {
+    const id = new URLSearchParams(location.search).get('id');
+    if(id){
+      const res = await fetch('/api/events/' + encodeURIComponent(id));
+      if(res.ok){ const data = await res.json(); return data.event ? [data.event] : []; }
+    }
+    const res = await fetch('/api/events');
+    if(!res.ok) throw new Error('api');
+    const data = await res.json();
+    return data.events || [];
+  } catch (_) {
+    const data = await fetch('/data/mock.json').then(r=>r.json());
+    return data.events || [];
+  }
+}
+
+function renderEvent(event){
+  currentEventId = event.id;
+  title.textContent=event.title||'饮水事件详情';
+  hero.style.backgroundImage='linear-gradient(180deg,rgba(26,24,20,.15),rgba(26,24,20,.65)),url(\'' + (event.img||'') + '\')';
+  summary.textContent=event.summary||event.desc||'暂无摘要';
+  timeRange.textContent=event.timeRange||'--';
+  duration.textContent=event.metric||'--';
+  confidence.textContent=event.confidence ?? '--';
+  estimatedMl.textContent=(event.estimatedMl ?? '--') + ' ml';
+  tag.textContent=event.tag||'--';
+  video.poster = event.img || '';
+  videoSource.src = '/api/event-video?id=' + encodeURIComponent(event.id);
+  video.load();
+  video.setAttribute('controls', 'controls');
+  videoHint.textContent = '正在加载饮水录像片段...';
+  video.onerror = function() {
+    videoHint.textContent = '当前无可播放片段，可能录像文件尚未生成或已过期。';
+    video.removeAttribute('controls');
+  };
+  video.onloadeddata = function() { videoHint.textContent = 'EasyNVR 饮水事件录像回放'; };
+  updateLabelUI(event);
+}
+
+async function loadLabelStats(){
+  try {
+    const res = await fetch('/api/labels/stats');
+    if(!res.ok) return;
+    const stats = await res.json();
+    const total = stats.total_labeled || 0;
+    const conf = stats.confirmed || 0;
+    const fp = stats.false_positive || 0;
+    const confirmedNeed = Math.max(0, (stats.threshold_confirmed || 50) - conf);
+    const fpNeed = Math.max(0, (stats.threshold_false_positive || 20) - fp);
+    let html = '已标注 <strong>' + total + '</strong> 个事件（确认 ' + conf + ' / 误报 ' + fp + '）';
+    if(stats.ready_to_train){
+      html += '<br><span class="ready">标注数据已充足，可以触发模型训练</span>';
+    } else {
+      html += '<br>还需 <strong>' + confirmedNeed + '</strong> 个确认样本 · <strong>' + fpNeed + '</strong> 个误报样本 触发训练';
+    }
+    labelStats.innerHTML = html;
+  } catch (_) { labelStats.textContent = '无法加载标注统计'; }
+}
+
+function updateLabelUI(event){
+  const existingLabel = event.label;
+  if(existingLabel === 'confirmed' || existingLabel === 'false_positive'){
+    labelActions.style.display = 'none';
+    labelStatus.style.display = 'block';
+    labelStatus.className = 'label-status ' + existingLabel;
+    const labelText = existingLabel === 'confirmed' ? '已确认饮水 ✓' : '已标记误报 ✗';
+    labelStatus.innerHTML = labelText + '<span class="label-change" onclick="showLabelActions()">更改标注</span>';
+  } else {
+    labelActions.style.display = 'flex';
+    labelStatus.style.display = 'none';
+  }
+}
+
+function showLabelActions(){
+  labelActions.style.display = 'flex';
+  labelStatus.style.display = 'none';
+}
+
+async function submitLabel(label){
+  if(!currentEventId) return;
+  const btns = labelActions.querySelectorAll('.btn-label');
+  btns.forEach(b => b.disabled = true);
+  try {
+    const res = await fetch('/api/events/label', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({event_id: currentEventId, label: label})
+    });
+    if(!res.ok){ const err = await res.json(); alert('标注失败: ' + (err.error || res.statusText)); btns.forEach(b => b.disabled = false); return; }
+    const data = await res.json();
+    updateLabelUI(data.event);
+    loadLabelStats();
+  } catch (e) { alert('网络错误: ' + e.message); btns.forEach(b => b.disabled = false); }
+}
+
+async function init(){
+  const id=new URLSearchParams(location.search).get('id');
+  if(!id){
+    title.textContent='请从仪表盘选择事件';
+    summary.textContent='请从仪表盘首页点击饮水事件进入详情页面。';
+    hero.style.background='#1a1814';
+    hero.style.display='flex'; hero.style.alignItems='center'; hero.style.justifyContent='center';
+    hero.innerHTML='<a href="/" style="color:#d4924a;font-size:18px;text-decoration:none;font-family:var(--font-heading)">← 返回仪表盘查看饮水事件</a>';
+    return;
+  }
+  const events=await loadEvents();
+  const event=events.find(e=>e.id===id)||events[0];
+  if(!event){ title.textContent='未找到事件'; summary.textContent='未找到该饮水事件，可能已被删除。'; return; }
+  renderEvent(event);
+  loadLabelStats();
+}
+init();
+</script></body></html>

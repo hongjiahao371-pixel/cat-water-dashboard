@@ -1,0 +1,78 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API 契约</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.back{display:inline-block;color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);margin-bottom:18px;transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}pre{padding:16px;border-radius:16px;background:rgba(245,239,224,.03);border:1px solid rgba(245,239,224,.05);overflow:auto;line-height:1.7;color:#d5cfc4}h1{font-family:var(--font-heading)}h3{font-family:var(--font-heading)}.muted{color:var(--muted);font-size:13px}</style></head><body><div class="wrap"><a class="back" href="/">← 返回面板</a><div class="card"><div class="inner"><h1>前后端 API 契约（V1）</h1><p class="muted">这版已经能作为 NAS 本地分析程序的接收面板使用；剩下主要是摄像头接入和算法调参。</p><h3>GET /api/dashboard/overview</h3><pre>{
+  "overview": {
+    "drinkCount": 6,
+    "waterMl": 38,
+    "durationSec": 248,
+    "avgDuration": 41.3,
+    "lastDrink": "2026-04-24T15:21:46+08:00",
+    "lastDrinkAgo": "距现在 1h 40m",
+    "healthMain": "饮水状态正常",
+    "healthDesc": "今天次数、时长、预估 ml 都在近 7 日均值范围内。"
+  },
+  "trends": {
+    "labels": ["04/18", "04/19", "04/20"],
+    "counts": [3,4,2],
+    "ml": [22,26,24]
+  },
+  "events": []
+}</pre><h3>GET /api/events</h3><pre>{
+  "events": []
+}</pre><h3>GET /api/events?id=event-20260424-1521</h3><pre>{
+  "event": {
+    "id": "event-20260424-1521"
+  }
+}</pre><h3>GET /api/events/event-20260424-1521</h3><pre>{
+  "event": {
+    "id": "event-20260424-1521"
+  }
+}</pre><h3>POST /api/events</h3><pre>{
+  "id": "event-20260424-1900",
+  "camera_id": "cat-water-cam-01",
+  "title": "19:00 - 19:01 · 疑似喝水事件",
+  "start_time": "2026-04-24T19:00:00+08:00",
+  "end_time": "2026-04-24T19:00:42+08:00",
+  "duration_sec": 42,
+  "estimated_ml": 6.3,
+  "confidence": 0.92,
+  "summary": "猫进入饮水区并保持低头姿态，疑似完成一次饮水。",
+  "tag": "自动写入",
+  "snapshot_url": "https://example.com/snapshot.jpg",
+  "clip_url": "https://example.com/clip.mp4"
+}</pre><h3>POST /api/daily-summary</h3><pre>{
+  "drink_count": 7,
+  "estimated_total_ml": 41,
+  "total_duration_sec": 286,
+  "avg_duration_sec": 40.8,
+  "last_drink_time": "16:08"
+}</pre><h3>GET /api/settings</h3><pre>{
+  "cameraName": "cat-water-cam-01",
+  "rtspUrl": "rtsp://admin:***@192.168.5.30:554/stream1",
+  "roi": {"x1":820,"y1":540,"x2":1320,"y2":980},
+  "fpsSample": 2,
+  "minPresenceSec": 3,
+  "mergeGapSec": 5,
+  "mlPerSec": 0.15,
+  "enableNoDrinkAlert": true,
+  "enableDailyReport": true,
+  "enableManualReview": true
+}</pre><h3>GET /api/push-settings</h3><pre>{
+  "openclawWebhook": "http://openclaw.local/api/integrations/openclaw/push",
+  "pushMode": "日报 + 异常提醒",
+  "summaryTemplate": "今日饮水次数：{{drink_count}}",
+  "feishuTarget": "chat:cat-health-report",
+  "noDrinkHours": 8,
+  "lowCountPercent": 30,
+  "enableFeishuDaily": true,
+  "enableFeishuAlert": true,
+  "enableLowIntakeAlert": true
+}</pre><h3>POST /api/integrations/openclaw/push</h3><pre>{
+  "type": "daily_report",
+  "title": "猫咪饮水日报",
+  "content": {
+    "drink_count": 6,
+    "estimated_total_ml": 38,
+    "last_drink_time": "15:21"
+  }
+}</pre><h3>GET /api/push-log</h3><pre>{
+  "items": []
+}</pre></div></div></div></body></html>

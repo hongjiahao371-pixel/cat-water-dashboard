@@ -1,0 +1,159 @@
+services:
+  cat-water-backfill:
+    build: .
+    command:
+    - python3
+    - -u
+    - recording_backfill_worker.py
+    container_name: cat-water-backfill
+    depends_on:
+    - cat-water-dashboard
+    environment:
+    - TZ=Asia/Shanghai
+    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
+    - EASYNVR_DB_PATH=/easynvr/configs/data.db
+    - EASYNVR_RECORD_ROOT=/easynvr_rec
+    - BACKFILL_CHANNEL_ID=
+    - BACKFILL_POLL_SEC=120
+    - BACKFILL_LOOKBACK_MIN=180
+    - BACKFILL_ANALYZE_FPS=1
+    - CAT_SCORE_THRESHOLD=0.40
+    - CAT_CROP_SCORE_THRESHOLD=0.25
+    - CAT_DETECT_PROVIDER_PREFERENCE=openvino,cpu
+    - CAT_DETECT_OPENVINO_DEVICE=AUTO
+    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
+    group_add:
+    - '44'
+    - '105'
+    image: cat-water-dashboard:latest
+    restart: unless-stopped
+    volumes:
+    - /dev/dri:/dev/dri
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models:/app/models:ro
+    - ./detection_worker.py:/app/detection_worker.py:ro
+    - /volume1/@appstore/com.ugreen.docker.easynvr:/easynvr:ro
+    - /volume1/docker/easynvr_rec:/easynvr_rec:ro
+  cat-water-camera:
+    build: .
+    command:
+    - python3
+    - -u
+    - camera_worker.py
+    container_name: cat-water-camera
+    depends_on:
+    - cat-water-dashboard
+    environment:
+    - TZ=Asia/Shanghai
+    - CAMERA_STREAM_URL=${CAMERA_STREAM_URL}
+    - CAMERA_CAPTURE_INTERVAL_SEC=5
+    - CAMERA_SNAPSHOT_STALE_SEC=45
+    group_add:
+    - '44'
+    - '105'
+    image: cat-water-dashboard:latest
+    restart: unless-stopped
+    volumes:
+    - /dev/dri:/dev/dri
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models:/app/models:ro
+  cat-water-dashboard:
+    build: .
+    container_name: cat-water-dashboard
+    environment:
+    - TZ=Asia/Shanghai
+    - CAMERA_LIVE_STREAM_URL=${CAMERA_LIVE_STREAM_URL}
+    group_add:
+    - '44'
+    - '105'
+    healthcheck:
+      interval: 30s
+      retries: 3
+      test:
+      - CMD
+      - python3
+      - -c
+      - from http.client import HTTPConnection; c = HTTPConnection('localhost', 39095,
+        timeout=2); c.request('GET', '/api/health'); r = c.getresponse(); raise SystemExit(0
+        if r.status == 200 else 1)
+      timeout: 10s
+    image: cat-water-dashboard:latest
+    ports:
+    - 39095:39095
+    restart: unless-stopped
+    volumes:
+    - /dev/dri:/dev/dri
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models:/app/models:ro
+    - /volume1/docker/easynvr_rec:/easynvr_rec:ro
+    - ./server.py:/app/server.py:ro
+    - ./events/index.html:/app/events/index.html:ro
+    - ./index.html:/app/index.html:ro
+  cat-water-detector:
+    build: .
+    command:
+    - python3
+    - -u
+    - detection_worker.py
+    container_name: cat-water-detector
+    depends_on:
+    - cat-water-dashboard
+    environment:
+    - TZ=Asia/Shanghai
+    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
+    - CAMERA_ANALYSIS_STREAM_URL=http://cat-water-qsv-transcode:39100/live.flv
+    - DETECTOR_MOTION_THRESHOLD=8
+    - CAT_SCORE_THRESHOLD=0.40
+    - CAT_CROP_SCORE_THRESHOLD=0.25
+    - DETECTOR_INTERVAL_SEC=1.0
+    - CAT_DETECT_PROVIDER_PREFERENCE=openvino,cpu
+    - CAT_DETECT_OPENVINO_DEVICE=AUTO
+    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
+    - DRINK_CHECK_MODEL_PATH=/app/models/cat_drinking_model_v2.onnx
+    - NIGHT_HIRES_RTSP_URL=${NIGHT_HIRES_RTSP_URL}
+    group_add:
+    - '44'
+    - '105'
+    image: cat-water-dashboard:latest
+    restart: unless-stopped
+    volumes:
+    - /dev/dri:/dev/dri
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models:/app/models:ro
+    - ./detection_worker.py:/app/detection_worker.py:ro
+  cat-water-qsv-transcode:
+    build: .
+    command:
+    - python3
+    - -u
+    - hd_live_worker.py
+    container_name: cat-water-qsv-transcode
+    environment:
+    - TZ=Asia/Shanghai
+    - RTSP_URL=${RTSP_URL}
+    - LISTEN_URL=http://0.0.0.0:39100/live.flv
+    - HWACCEL_MODE=cpu
+    - SCALE_WIDTH=960
+    - PRESET=ultrafast
+    - GOP=30
+    - MAXRATE=3000k
+    - BUFSIZE=6000k
+    - OUTPUT_FPS=8
+    - CRF=23
+    group_add:
+    - '44'
+    - '105'
+    image: cat-water-dashboard:latest
+    ports:
+    - 39100:39100
+    restart: unless-stopped
+    volumes:
+    - /dev/dri:/dev/dri
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models:/app/models:ro
+    - ./hd_live_worker.py:/app/hd_live_worker.py:ro

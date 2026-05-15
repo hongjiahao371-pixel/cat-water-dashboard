@@ -1,0 +1,48 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>设备与规则设置</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--ok:#7aaa54;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.back{color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}h3{font-family:var(--font-heading)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-size:13px;color:var(--muted)}.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:14px;border:1px solid rgba(245,239,224,.08);background:rgba(245,239,224,.04);color:var(--text);font-family:var(--font-body)}.switch{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid rgba(245,239,224,.05)}.switch input{width:18px;height:18px;accent-color:var(--ok)}.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:600;background:var(--brand);color:#fff;cursor:pointer;font-family:var(--font-body);transition:all .2s}.btn:hover{opacity:.9}.note{margin-top:12px;padding:14px 16px;border-radius:16px;background:rgba(212,146,74,.08);border:1px solid rgba(212,146,74,.14);color:#d5cfc4;font-size:13px;line-height:1.6}@media(max-width:900px){.grid{grid-template-columns:1fr}}</style></head><body><div class="wrap"><div class="top"><a class="back" href="/">← 返回面板</a><div style="font-size:28px;font-weight:700;font-family:var(--font-heading)">设备与规则设置</div></div><div class="grid"><div class="card"><div class="inner"><h3 style="margin-top:0">摄像头与 ROI</h3><div class="field"><label>RTSP 地址</label><input id="rtspUrl" value="rtsp://admin:***@192.168.5.30:554/stream1"></div><div class="field"><label>摄像头名称</label><input id="cameraName" value="cat-water-cam-01"></div><div class="field"><label>ROI 配置（JSON）</label><textarea id="roi" rows="6">{
+  "x1": 820,
+  "y1": 540,
+  "x2": 1320,
+  "y2": 980
+}</textarea></div><div class="field"><label>抽帧频率</label><select id="fpsSample"><option value="2">2 FPS</option><option value="1">1 FPS</option><option value="3">3 FPS</option></select></div><button class="btn" id="saveCamera">保存摄像头配置</button><div class="note">后续这里可以直接读取 NAS 上分析程序的配置文件，支持在线更新 ROI 和采样率。</div></div></div><div class="card"><div class="inner"><h3 style="margin-top:0">识别与提醒规则</h3><div class="field"><label>最短饮水事件时长（秒）</label><input id="minPresenceSec" value="3"></div><div class="field"><label>事件合并间隔（秒）</label><input id="mergeGapSec" value="5"></div><div class="field"><label>预估饮水量换算系数（ml/s）</label><input id="mlPerSec" value="0.15"></div><label class="switch"><span>长时间未饮水提醒</span><input id="enableNoDrinkAlert" type="checkbox" checked></label><label class="switch"><span>日报自动推送</span><input id="enableDailyReport" type="checkbox" checked></label><label class="switch"><span>误报人工确认开关</span><input id="enableManualReview" type="checkbox" checked></label><button class="btn" id="saveRules" style="margin-top:14px">保存规则配置</button></div></div></div></div><script>
+function getPayload(){
+  return {
+    rtspUrl: document.getElementById('rtspUrl').value,
+    cameraName: document.getElementById('cameraName').value,
+    roi: JSON.parse(document.getElementById('roi').value),
+    fpsSample: Number(document.getElementById('fpsSample').value),
+    minPresenceSec: Number(document.getElementById('minPresenceSec').value),
+    mergeGapSec: Number(document.getElementById('mergeGapSec').value),
+    mlPerSec: Number(document.getElementById('mlPerSec').value),
+    enableNoDrinkAlert: document.getElementById('enableNoDrinkAlert').checked,
+    enableDailyReport: document.getElementById('enableDailyReport').checked,
+    enableManualReview: document.getElementById('enableManualReview').checked
+  };
+}
+function fillForm(data){
+  rtspUrl.value=data.rtspUrl||'';
+  cameraName.value=data.cameraName||'';
+  roi.value=JSON.stringify(data.roi||{},null,2);
+  fpsSample.value=String(data.fpsSample||2);
+  minPresenceSec.value=data.minPresenceSec ?? 3;
+  mergeGapSec.value=data.mergeGapSec ?? 5;
+  mlPerSec.value=data.mlPerSec ?? 0.15;
+  enableNoDrinkAlert.checked=Boolean(data.enableNoDrinkAlert);
+  enableDailyReport.checked=Boolean(data.enableDailyReport);
+  enableManualReview.checked=Boolean(data.enableManualReview);
+}
+async function load(){
+  const data = await fetch('/api/settings').then(r=>r.json());
+  fillForm(data);
+}
+async function save(){
+  let payload;
+  try { payload = getPayload(); } catch (_) { alert('ROI JSON 格式不合法'); return; }
+  const res = await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data = await res.json();
+  if(data.ok){ fillForm(data.settings); alert('设置已保存'); return; }
+  alert(data.error || '保存失败');
+}
+document.getElementById('saveCamera').onclick=save;
+document.getElementById('saveRules').onclick=save;
+load();
+</script></body></html>

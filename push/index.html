@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>推送与 OpenClaw 集成</title>
+  <style>
+    :root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--ok:#7aaa54;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.back{color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}h3{font-family:var(--font-heading)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-size:13px;color:var(--muted)}.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:14px;border:1px solid rgba(245,239,224,.08);background:rgba(245,239,224,.04);color:var(--text);font-family:var(--font-body)}.check{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid rgba(245,239,224,.05)}.check input{width:18px;height:18px;accent-color:var(--ok)}.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:600;background:var(--brand);color:#fff;cursor:pointer;font-family:var(--font-body);transition:all .2s}.btn:hover{opacity:.9}.btn.secondary{background:rgba(245,239,224,.05);border:1px solid rgba(245,239,224,.08)}.actions{display:flex;gap:12px;flex-wrap:wrap}.note{margin-top:12px;padding:14px 16px;border-radius:16px;background:rgba(212,146,74,.08);border:1px solid rgba(212,146,74,.14);color:#d5cfc4;font-size:13px;line-height:1.6}.status{margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(122,170,84,.08);border:1px solid rgba(122,170,84,.16);font-size:13px;color:#c8e8d0}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="back" href="/">← 返回面板</a>
+      <div style="font-size:28px;font-weight:700;font-family:var(--font-heading)">推送与 OpenClaw 集成</div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="inner">
+          <h3 style="margin-top:0">OpenClaw Webhook</h3>
+          <div class="field"><label>Webhook 地址</label><input id="openclawWebhook"></div>
+          <div class="field"><label>默认推送类型</label><select id="pushMode"><option>日报 + 异常提醒</option><option>仅异常提醒</option><option>仅日报</option></select></div>
+          <div class="field"><label>附加摘要模板</label><textarea id="summaryTemplate" rows="6"></textarea></div>
+          <div class="actions">
+            <button class="btn" id="saveWebhook">保存 OpenClaw 配置</button>
+            <button class="btn secondary" id="testPush">发送测试推送</button>
+          </div>
+          <div class="note">面板当前会记录推送配置与测试推送请求，后续可以直接接入真实 OpenClaw / 飞书消息链路。</div>
+          <div class="status" id="pushStatus">尚未加载配置</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="inner">
+          <h3 style="margin-top:0">飞书与推送策略</h3>
+          <div class="field"><label>飞书目标会话 / Chat ID</label><input id="feishuTarget"></div>
+          <div class="field"><label>无饮水提醒阈值（小时）</label><input id="noDrinkHours" type="number" min="1" step="1"></div>
+          <div class="field"><label>低于近 7 日均值阈值（%）</label><input id="lowCountPercent" type="number" min="1" step="1"></div>
+          <div class="field"><label>异常阈值说明</label><textarea id="strategyPreview" rows="5" readonly></textarea></div>
+          <label class="check"><span>日报推送到飞书</span><input id="enableFeishuDaily" type="checkbox"></label>
+          <label class="check"><span>长时间未饮水提醒</span><input id="enableFeishuAlert" type="checkbox"></label>
+          <label class="check"><span>低饮水量预警</span><input id="enableLowIntakeAlert" type="checkbox"></label>
+          <div class="actions" style="margin-top:14px">
+            <button class="btn" id="saveStrategy">保存飞书策略</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<script>
+function updateStrategyPreview(){
+  strategyPreview.value = (noDrinkHours.value || 8) + ' 小时无饮水 → ' + (enableFeishuAlert.checked ? '发送提醒' : '不提醒') + '\n当日饮水次数低于近 7 日均值 ' + (lowCountPercent.value || 30) + '% → ' + (enableLowIntakeAlert.checked ? '发送预警' : '仅记录') + '\n日报推送 → ' + (enableFeishuDaily.checked ? '开启' : '关闭');
+}
+function fillForm(data){
+  openclawWebhook.value = data.openclawWebhook || '';
+  pushMode.value = data.pushMode || '日报 + 异常提醒';
+  summaryTemplate.value = data.summaryTemplate || '';
+  feishuTarget.value = data.feishuTarget || '';
+  noDrinkHours.value = data.noDrinkHours ?? 8;
+  lowCountPercent.value = data.lowCountPercent ?? 30;
+  enableFeishuDaily.checked = Boolean(data.enableFeishuDaily);
+  enableFeishuAlert.checked = Boolean(data.enableFeishuAlert);
+  enableLowIntakeAlert.checked = Boolean(data.enableLowIntakeAlert);
+  updateStrategyPreview();
+  pushStatus.textContent = '当前：' + pushMode.value + ' · Webhook ' + (openclawWebhook.value ? '已配置' : '未配置') + ' · 飞书 ' + (feishuTarget.value || '未填写');
+}
+function buildPayload(){
+  return {
+    openclawWebhook: openclawWebhook.value.trim(),
+    pushMode: pushMode.value,
+    summaryTemplate: summaryTemplate.value,
+    feishuTarget: feishuTarget.value.trim(),
+    noDrinkHours: Number(noDrinkHours.value || 8),
+    lowCountPercent: Number(lowCountPercent.value || 30),
+    enableFeishuDaily: enableFeishuDaily.checked,
+    enableFeishuAlert: enableFeishuAlert.checked,
+    enableLowIntakeAlert: enableLowIntakeAlert.checked
+  };
+}
+async function load(){
+  const data = await fetch('/api/push-settings').then(r => r.json());
+  fillForm(data);
+}
+async function save(){
+  const res = await fetch('/api/push-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildPayload()) });
+  const data = await res.json();
+  if(!data.ok){ alert(data.error || '保存失败'); return; }
+  fillForm(data.push);
+  alert('推送配置已保存');
+}
+async function testPush(){
+  const payload = buildPayload();
+  const res = await fetch('/api/integrations/openclaw/push', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ type:'test_push', title:'猫咪饮水监控测试推送', target: payload.feishuTarget, mode: payload.pushMode, content:{ drink_count: 6, estimated_total_ml: 38, last_drink_time: '15:21' } }) });
+  const data = await res.json();
+  alert(data.message || '已触发');
+}
+[noDrinkHours, lowCountPercent, enableFeishuDaily, enableFeishuAlert, enableLowIntakeAlert].forEach(el => el.addEventListener('input', updateStrategyPreview));
+document.getElementById('saveWebhook').onclick = save;
+document.getElementById('saveStrategy').onclick = save;
+document.getElementById('testPush').onclick = testPush;
+load();
+</script>
+</body>
+</html>
