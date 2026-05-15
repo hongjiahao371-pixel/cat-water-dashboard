@@ -1,0 +1,38 @@
+# Models
+models/
+
+# Media 
+media/
+
+# Data
+data/
+
+# Archives
+archive/
+
+# Training images
+cat_dataset_new/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Backup files
+*.bak
+*.bak_*
+
+# Logs
+*.log
+
+# Environment
+.env
+
+# Git
+.git/
+.gitignore
+.dockerignore
+README.md
+
+# OS
+.DS_Store
+Thumbs.db
