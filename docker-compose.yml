@@ -1,6 +1,5 @@
 services:
   cat-water-backfill:
-    build: .
     command:
     - python3
     - -u
@@ -19,13 +18,17 @@ services:
     - BACKFILL_ANALYZE_FPS=1
     - CAT_SCORE_THRESHOLD=0.40
     - CAT_CROP_SCORE_THRESHOLD=0.25
+    - CAT_HINT_MOTION_THRESHOLD=3.0
+    - LICK_MIN_SIGNAL=2.0
+    - DRINK_CONFIRM_MIN_SIGNAL=2.5
     - CAT_DETECT_PROVIDER_PREFERENCE=openvino,cpu
     - CAT_DETECT_OPENVINO_DEVICE=AUTO
     - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
     group_add:
     - '44'
     - '105'
-    image: cat-water-dashboard:latest
+    build: .
+    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     restart: unless-stopped
     volumes:
     - /dev/dri:/dev/dri
@@ -33,10 +36,10 @@ services:
     - ./media:/app/media
     - ./models:/app/models:ro
     - ./detection_worker.py:/app/detection_worker.py:ro
+    - ./index.html:/app/index.html:ro
     - /volume1/@appstore/com.ugreen.docker.easynvr:/easynvr:ro
     - /volume1/docker/easynvr_rec:/easynvr_rec:ro
   cat-water-camera:
-    build: .
     command:
     - python3
     - -u
@@ -46,13 +49,14 @@ services:
     - cat-water-dashboard
     environment:
     - TZ=Asia/Shanghai
-    - CAMERA_STREAM_URL=${CAMERA_STREAM_URL}
+    - CAMERA_STREAM_URL=http://192.168.5.17:10000/live/OpD6HNpPU8j0X_profile_2.flv
     - CAMERA_CAPTURE_INTERVAL_SEC=5
     - CAMERA_SNAPSHOT_STALE_SEC=45
     group_add:
     - '44'
     - '105'
-    image: cat-water-dashboard:latest
+    build: .
+    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     restart: unless-stopped
     volumes:
     - /dev/dri:/dev/dri
@@ -60,11 +64,10 @@ services:
     - ./media:/app/media
     - ./models:/app/models:ro
   cat-water-dashboard:
-    build: .
     container_name: cat-water-dashboard
     environment:
     - TZ=Asia/Shanghai
-    - CAMERA_LIVE_STREAM_URL=${CAMERA_LIVE_STREAM_URL}
+    - CAMERA_LIVE_STREAM_URL=http://192.168.5.17:10000/live/OpML1KfFPOkPF_profile_1.flv
     group_add:
     - '44'
     - '105'
@@ -79,7 +82,8 @@ services:
         timeout=2); c.request('GET', '/api/health'); r = c.getresponse(); raise SystemExit(0
         if r.status == 200 else 1)
       timeout: 10s
-    image: cat-water-dashboard:latest
+    build: .
+    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     ports:
     - 39095:39095
     restart: unless-stopped
@@ -93,7 +97,6 @@ services:
     - ./events/index.html:/app/events/index.html:ro
     - ./index.html:/app/index.html:ro
   cat-water-detector:
-    build: .
     command:
     - python3
     - -u
@@ -113,11 +116,12 @@ services:
     - CAT_DETECT_OPENVINO_DEVICE=AUTO
     - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
     - DRINK_CHECK_MODEL_PATH=/app/models/cat_drinking_model_v2.onnx
-    - NIGHT_HIRES_RTSP_URL=${NIGHT_HIRES_RTSP_URL}
+    - NIGHT_HIRES_RTSP_URL=rtsp://admin:Hjh1981940361@192.168.5.41:554/stream1
     group_add:
     - '44'
     - '105'
-    image: cat-water-dashboard:latest
+    build: .
+    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     restart: unless-stopped
     volumes:
     - /dev/dri:/dev/dri
@@ -126,7 +130,6 @@ services:
     - ./models:/app/models:ro
     - ./detection_worker.py:/app/detection_worker.py:ro
   cat-water-qsv-transcode:
-    build: .
     command:
     - python3
     - -u
@@ -134,7 +137,7 @@ services:
     container_name: cat-water-qsv-transcode
     environment:
     - TZ=Asia/Shanghai
-    - RTSP_URL=${RTSP_URL}
+    - RTSP_URL=rtsp://admin:Hjh1981940361@192.168.5.41:554/stream1
     - LISTEN_URL=http://0.0.0.0:39100/live.flv
     - HWACCEL_MODE=cpu
     - SCALE_WIDTH=960
@@ -147,7 +150,8 @@ services:
     group_add:
     - '44'
     - '105'
-    image: cat-water-dashboard:latest
+    build: .
+    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     ports:
     - 39100:39100
     restart: unless-stopped
