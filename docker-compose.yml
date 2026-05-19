@@ -36,6 +36,7 @@ services:
     - ./media:/app/media
     - ./models:/app/models:ro
     - ./detection_worker.py:/app/detection_worker.py:ro
+    - ./camera_drift.py:/app/camera_drift.py:ro
     - ./index.html:/app/index.html:ro
     - /volume1/@appstore/com.ugreen.docker.easynvr:/easynvr:ro
     - /volume1/docker/easynvr_rec:/easynvr_rec:ro

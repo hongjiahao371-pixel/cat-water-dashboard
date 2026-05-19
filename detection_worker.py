@@ -9,6 +9,7 @@ contrast enhancement, and lowers detection thresholds for improved nighttime acc
 import json, os, sys, time, urllib.request
 from datetime import datetime
 from pathlib import Path
+from camera_drift import check_camera_drift
 import cv2
 import numpy as np
 import onnxruntime as ort
@@ -118,6 +119,7 @@ CONSECUTIVE_FRAMES_REQUIRED = int(os.environ.get('CONSECUTIVE_FRAMES_REQUIRED', 
 EVENT_DIR.mkdir(parents=True, exist_ok=True)
 STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
+CAM_SYNC_INTERVAL = float(os.environ.get('CAM_SYNC_INTERVAL', '7200'))
 DEFAULT_SETTINGS = {
     'roi': {'x1': 112, 'y1': 291, 'x2': 1132, 'y2': 620},
     'fountainZone': {'x1': 200, 'y1': 400, 'x2': 1080, 'y2': 700},
@@ -246,12 +248,11 @@ class CatDetector:
         self.last_result = {'cat_detected': False, 'cat_score': 0.0, 'cat_box': [],
                              'water_occupied': False}
         self._hires_cap = None  # Persistent RTSP connection for night hires grabs
-        self._mog2 = cv2.createBackgroundSubtractorMOG2(
-            history=NIGHT_MOG2_HISTORY, varThreshold=NIGHT_MOG2_VAR_THRESHOLD, detectShadows=False)
-        self._mog2_warmed = False
-        self._mog2_warm_frames = 0
+
         # Night water zone: running-average background model (works better than MOG2
         # on uniform fountain surfaces where MOG2's Gaussian model sees no variance).
+        self._frame_w = 0        # Transcode frame width (learned from first frame)
+        self._frame_h = 0        # Transcode frame height
         self._wz_bg = None       # Running-average background of water zone
         self._wz_bg_frames = 0   # Number of frames accumulated into background
         self._consecutive_cat = 0  # Consecutive frames with cat detected
@@ -373,14 +374,16 @@ class CatDetector:
                 self._hires_cap = None
                 return None, 0, 0
             hires_h, hires_w = frame.shape[:2]
-            scale_x = 960.0 / hires_w   # to transcode coords
-            scale_y = 540.0 / hires_h
+            scale_x = float(self._frame_w) / hires_w if self._frame_w else 960.0 / hires_w
+            scale_y = float(self._frame_h) / hires_h if self._frame_h else 540.0 / hires_h
             return frame, scale_x, scale_y
         except Exception:
             self._hires_cap = None
             return None, 0, 0
 
     def detect(self, frame, force=False, fzone=None, wzone=None):
+        if self._frame_w == 0 and frame is not None and frame.size > 0:
+            self._frame_h, self._frame_w = frame.shape[:2]
         now = time.time()
         if not self.session:
             return self.last_result
@@ -394,18 +397,16 @@ class CatDetector:
         score_thresh = NIGHT_CAT_SCORE_THRESHOLD if night_mode else CAT_SCORE_THRESHOLD
         crop_thresh = NIGHT_CAT_CROP_THRESHOLD if night_mode else CAT_CROP_SCORE_THRESHOLD
 
-        candidates = self._infer_candidates(frame, score_thresh, night_mode=night_mode)
+        # Night mode: use lower threshold on full frame to catch marginal cats
+        # (combines what was previously two separate passes)
+        full_thresh = min(score_thresh, crop_thresh) if night_mode else score_thresh
+        candidates = self._infer_candidates(frame, full_thresh, night_mode=night_mode)
         # Second pass on bottom crop for distant/small cats
         crop_start = max(0, min(h-1, int(h * BOTTOM_CROP_START_RATIO)))
         if crop_start > 0 and crop_start < h and (not candidates or max((c['score'] for c in candidates), default=0) < 0.55):
             crop = frame[crop_start:h, 0:w]
             if crop.size:
                 candidates.extend(self._infer_candidates(crop, crop_thresh, 0, crop_start, night_mode=night_mode))
-        # Night mode: extra detection passes for IR footage.
-        if night_mode:
-            # Pass 3: full frame with low threshold — catches marginal cats that
-            # score between crop_thresh and score_thresh.
-            candidates.extend(self._infer_candidates(frame, crop_thresh, night_mode=True))
             # Pass 4: high-res RTSP grab → wide crop at fountain bottom → YOLO.
             hires_frame, hsx, hsy = self._grab_hires_frame()
             if hires_frame is not None and fzone and len(fzone) == 4:
@@ -438,13 +439,19 @@ class CatDetector:
                 if night_mode:
                     gray = cv2.cvtColor(wcrop, cv2.COLOR_BGR2GRAY).astype(np.float32)
                     if self._wz_bg is None or self._wz_bg.shape != gray.shape:
-                        self._wz_bg = gray
-                        self._wz_bg_frames = 1
-                    else:
+                        # Don't init background from a frame with high variance (cat present)
+                        if float(np.std(gray)) < 30:
+                            self._wz_bg = gray.copy()
+                            self._wz_bg_frames = 1
+                    elif self._wz_bg_frames > 0:
                         bg_diff = float(np.mean(cv2.absdiff(gray, self._wz_bg)))
                         if bg_diff < 6.0:
                             cv2.accumulateWeighted(gray, self._wz_bg, 0.02)
                             self._wz_bg_frames += 1
+                        elif self._wz_bg_frames < NIGHT_WATER_BG_FRAMES:
+                            # Background unreliable, reset with current frame
+                            self._wz_bg = gray.copy()
+                            self._wz_bg_frames = 1
                     if self._wz_bg_frames > NIGHT_WATER_BG_FRAMES:
                         diff = cv2.absdiff(gray, self._wz_bg)
                         _, diff_th = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
@@ -453,7 +460,7 @@ class CatDetector:
                         if NIGHT_WATER_FG_MIN < fg_px < 5000:
                             water_occupied = True
                 else:
-                    wz_thresh = WATER_ZONE_CROP_THRESHOLD if not night_mode else crop_thresh
+                    wz_thresh = WATER_ZONE_CROP_THRESHOLD
                     wz_cands = self._infer_candidates(wcrop, wz_thresh, wx1, wy1, night_mode=False)
                     water_occupied = any(c['score'] >= wz_thresh for c in wz_cands)
         # Filter invalid boxes
@@ -541,13 +548,15 @@ def main():
     cat_near_since = None          # When cat first entered near-water zone (prolonged presence safety net)
     event_active = False
     current_event_id = None
+    event_start_night = False  # Night mode at event start for consistent threshold
     peak_cat_score = 0.0          # Max cat score during current event
     last_detection_result = None   # Cached result when skipping YOLO
     last_detection_time = 0.0
     last_drink_end_at = None       # Timestamp of last drink event end
     fps = 0.0                      # Current FPS
     night_mode = False             # Current day/night state
-    last_forced_inference = 0.0    # Last forced YOLO run in night mode
+    last_forced_inference = 0.0
+    last_cam_sync = 0.0    # Last forced YOLO run in night mode
 
     while True:
         try:
@@ -584,6 +593,10 @@ def main():
                 # Check for model switch
                 if detector.reload_if_changed():
                     print("Model hot-reloaded successfully")
+                # Check camera drift periodically
+                if time.time() - last_cam_sync > CAM_SYNC_INTERVAL:
+                    check_camera_drift()
+                    last_cam_sync = time.time()
 
             # Detect night mode once per frame (cheap HSV conversion)
             night_mode = is_night_mode(frame)
@@ -592,9 +605,14 @@ def main():
             motion_thresh = NIGHT_MOTION_THRESHOLD if night_mode else MOTION_THRESHOLD
             should_detect = motion.has_motion(frame, threshold=motion_thresh)
 
-            # Night mode: force periodic YOLO inference even without motion.
+            # Force inference during active drinking tracking or confirmed event.
+            # Without this, motion pre-filter drops detection when cat stands still to drink.
             is_forced = False
-            if night_mode and not should_detect:
+            if cat_in_zone_since is not None or event_active:
+                if not should_detect:
+                    should_detect = True
+                    is_forced = True
+            elif night_mode and not should_detect:
                 if time.time() - last_forced_inference >= NIGHT_FORCE_INFERENCE_SEC:
                     should_detect = True
                     is_forced = True
@@ -636,8 +654,13 @@ def main():
             cat_near_water = False
             if cat_visible and cat_box and len(cat_box) == 4 and wzone:
                 cat_head_x_near = (cat_box[0] + cat_box[2]) / 2
-                cat_near_water = wzone[0] <= cat_head_x_near <= wzone[2] and cat_score >= NEAR_WATER_SCORE_MIN
-            drinking = cat_at_water or water_occupied
+                cat_head_y_near = cat_box[3] if cat_box else 0
+                near_water_surface = abs(cat_head_y_near - scaled_water_y) < 80 * sy if wzone else False
+                cat_near_water = (wzone[0] <= cat_head_x_near <= wzone[2]
+                               and near_water_surface
+                               and cat_score >= NEAR_WATER_SCORE_MIN)
+            cat_in_fz, _ = cat_in_fountain(cat_box, fzone) if cat_box else (False, 0)
+            drinking = cat_at_water or (water_occupied and cat_in_fz)
 
             now = time.time()
 
@@ -660,9 +683,10 @@ def main():
                     cat_in_zone_since = now
 
                 duration = now - cat_in_zone_since
-                min_sec = NIGHT_DRINK_MIN_SEC if night_mode else DRINK_MIN_SEC
+                min_sec = NIGHT_DRINK_MIN_SEC if event_start_night else DRINK_MIN_SEC
                 if not event_active and duration >= min_sec:
                     event_active = True
+                    event_start_night = night_mode
                     current_event_id = f"event-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
                     snap_path = str(EVENT_DIR / f'snap-{current_event_id}.jpg')
                     cv2.imwrite(snap_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -712,6 +736,7 @@ def main():
                             last_drink_end_at = datetime.now().astimezone().isoformat(timespec='seconds')
                         cat_in_zone_since = None
                         event_active = False
+                        event_start_night = False
                         current_event_id = None
                         peak_cat_score = 0.0
 
@@ -720,14 +745,16 @@ def main():
                 fps = frame_count / (time.time() - last_fps_check)
                 duration = (now - cat_in_zone_since) if cat_in_zone_since and drinking else 0
                 nflag = "NIGHT" if night_mode else "DAY"
+                streak = (now - cat_in_zone_since) if cat_in_zone_since and event_active else 0.0
                 print(f"FPS:{fps:.1f} cat_vis={cat_visible} wsurf={cat_at_water} "
                       f"water={water_occupied} drinking={event_active} dur={duration:.1f}s "
-                      f"score={result.get('cat_score',0):.2f} skip={not should_detect} [{nflag}]")
+                      f"score={result.get('cat_score',0):.2f} skip={not should_detect} "
+                      f"streak={streak:.1f} near={cat_near_water} infz={cat_in_fz} [{nflag}]")
                 frame_count = 0
                 last_fps_check = time.time()
 
-            if time.time() - last_status > 2:
-                streak = (now - cat_in_zone_since) if cat_in_zone_since and drinking else 0.0
+            if time.time() - last_status > 5:
+                streak = (now - cat_in_zone_since) if cat_in_zone_since and event_active else 0.0
                 write_status({
                     'ok': True, 'phase': 'running',
                     'cat_visible': cat_visible,

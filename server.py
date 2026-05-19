@@ -7,6 +7,7 @@ import subprocess
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from threading import Lock
+import re
 from datetime import datetime, timezone, timedelta
 from time import time, sleep
 from urllib.error import URLError
@@ -92,29 +93,79 @@ DEFAULT_LABEL_STATS = {
 }
 
 
-def read_json(path, default):
-    with FILE_LOCK:
+def read_json(path, default, skip_lock=False):
+    def _read():
         if path.exists():
             try:
                 return json.loads(path.read_text(encoding='utf-8'))
             except (json.JSONDecodeError, OSError):
                 path.write_text(json.dumps(default, ensure_ascii=False, indent=2), encoding='utf-8')
                 return json.loads(json.dumps(default))
-        path.write_text(json.dumps(default, ensure_ascii=False, indent=2), encoding='utf-8')
         return json.loads(json.dumps(default))
-
-
-def write_json(path, payload):
+    if skip_lock:
+        return _read()
     with FILE_LOCK:
+        return _read()
+
+
+def write_json(path, payload, skip_lock=False):
+    def _write():
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    if skip_lock:
+        _write()
+    else:
+        with FILE_LOCK:
+            _write()
 
 
-def load_dashboard_data():
-    return read_json(DATA_FILE, {'overview': {}, 'trends': {}, 'events': []})
+def load_dashboard_data(skip_lock=False):
+    return read_json(DATA_FILE, {'overview': {}, 'trends': {}, 'events': []}, skip_lock=skip_lock)
 
 
-def save_dashboard_data(data):
-    write_json(DATA_FILE, data)
+def save_dashboard_data(data, skip_lock=False):
+    write_json(DATA_FILE, data, skip_lock=skip_lock)
+    _rotate_events(data)
+
+EVENT_ARCHIVE_DIR = DATA_DIR / 'events_archive'
+EVENT_RETENTION_DAYS = int(os.environ.get('EVENT_RETENTION_DAYS', '90'))
+EVENT_ACTIVE_LIMIT = int(os.environ.get('EVENT_ACTIVE_LIMIT', '500'))
+
+def _rotate_events(data):
+    """Archive events older than retention period, keep active file lean."""
+    events = data.get('events', [])
+    if len(events) <= EVENT_ACTIVE_LIMIT:
+        return
+    EVENT_ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+    # Group events by date
+    from collections import defaultdict
+    by_date = defaultdict(list)
+    for e in events:
+        ts = e.get('start_time', '')
+        date_key = ts[:10] if 'T' in ts else 'unknown'
+        by_date[date_key].append(e)
+    # Find dates older than retention
+    cutoff = (datetime.now(CST) - timedelta(days=EVENT_RETENTION_DAYS)).strftime('%Y-%m-%d')
+    to_archive = {d: evts for d, evts in by_date.items() if d < cutoff and d != 'unknown'}
+    if not to_archive:
+        return
+    # Write archive files
+    for date_key, evts in to_archive.items():
+        archive_file = EVENT_ARCHIVE_DIR / f'events-{date_key}.json'
+        existing = []
+        if archive_file.exists():
+            try:
+                existing = json.loads(archive_file.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+        existing_ids = {e.get('id') for e in existing}
+        for e in evts:
+            if e.get('id') not in existing_ids:
+                existing.append(e)
+        archive_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
+    # Remove archived events from active data
+    archived_ids = {e.get('id') for evts in to_archive.values() for e in evts}
+    data['events'] = [e for e in events if e.get('id') not in archived_ids]
+    print(f"Archived {len(archived_ids)} events to {EVENT_ARCHIVE_DIR}")
 
 
 def load_settings():
@@ -254,7 +305,6 @@ def clean_time(ts):
     if not ts or not isinstance(ts, str):
         return ts or ''
     # Remove timezone suffix like +08:00, +09:00, Z, etc.
-    import re
     return re.sub(r'[+-]\d{2}:\d{2}$', '', ts).rstrip('Z')
 
 def fmt_time(ts):
@@ -264,6 +314,29 @@ def fmt_time(ts):
         date_part, time_part = clean.split('T', 1)
         return time_part[:8] if len(time_part) >= 8 else time_part
     return clean
+
+
+def ensure_event_fields(evt):
+    """Add formatted display fields to an event dict if missing."""
+    if not evt.get('title'):
+        start = fmt_time(evt.get('start_time', ''))
+        evt['title'] = f"{start} · 猫咪喝水" if start else '饮水事件'
+    if not evt.get('desc'):
+        evt['desc'] = '猫咪靠近饮水机并停留'
+    if not evt.get('metric'):
+        dur = float(evt.get('duration_sec', 0) or 0)
+        evt['metric'] = f"{round(dur, 1)}s" if dur % 1 else f"{int(dur)}s"
+    if not evt.get('tag'):
+        evt['tag'] = '喝水事件'
+    if not evt.get('img'):
+        evt['img'] = evt.get('snapshot_url', '')
+    if not evt.get('timeRange'):
+        s = fmt_time(evt.get('start_time', ''))
+        e = fmt_time(evt.get('end_time', ''))
+        evt['timeRange'] = f"{s} ~ {e}" if s and e else s or '--'
+    if not evt.get('estimatedMl'):
+        evt['estimatedMl'] = evt.get('estimated_ml', 0)
+    return evt
 
 CST = timezone(timedelta(hours=8))
 
@@ -333,8 +406,8 @@ def recalc_overview(data):
     from datetime import datetime, timedelta
     overview = data.setdefault('overview', {})
     events = data.get('events', [])
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    week_start = (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d')
+    today_str = datetime.now(CST).strftime('%Y-%m-%d')
+    week_start = (datetime.now(CST) - timedelta(days=6)).strftime('%Y-%m-%d')
     today_events = [e for e in events if e.get('start_time','').startswith(today_str) and e.get('label') != 'false_positive']
     week_events = [e for e in events if e.get('start_time','')[:10] >= week_start and e.get('label') != 'false_positive']
     today_count = len(today_events)
@@ -458,7 +531,10 @@ def easynvr_login():
         request = Request(f'{EASYNVR_BASE_URL}/login', data=payload, headers={'Content-Type': 'application/json'})
         response = urlopen(request, timeout=10)
         data = json.loads(response.read().decode('utf-8'))
-        token = data['token']
+        token = data.get('token')
+        if not token:
+            EASYNVR_SESSION['token'] = None
+            return None
         EASYNVR_SESSION['token'] = token
         EASYNVR_SESSION['expired_at'] = int(data.get('expired_at', int(time()) + 3600))
         return token
@@ -474,7 +550,7 @@ def easynvr_play_address():
     )
     response = urlopen(request, timeout=10)
     data = json.loads(response.read().decode('utf-8'))
-    return data['address']['hls']
+    return data.get('address', {}).get('hls', '')
 
 
 def fetch_hls_playlist():
@@ -612,33 +688,15 @@ class Handler(SimpleHTTPRequestHandler):
         path = parsed.path
         if path == '/api/dashboard/overview':
             data = load_dashboard_data()
-            overview = data.get('overview', {})
-            events = data.get('events', [])
-            # Compute today's stats from events (not the all-time accumulator)
-            today_str = datetime.now().strftime('%Y-%m-%d')
-            week_start = (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d')
-            today_events = [e for e in events if e.get('start_time','').startswith(today_str) and e.get('label') != 'false_positive']
-            week_events = [e for e in events if e.get('start_time','')[:10] >= week_start and e.get('label') != 'false_positive']
-            today_count = len(today_events)
-            today_ml = round(sum(float(e.get('estimatedMl', 0) or 0) for e in today_events), 1)
-            today_dur = int(sum(parse_duration(e.get('metric','0')) for e in today_events))
-            overview['drinkCount'] = today_count
-            overview['waterMl'] = today_ml
-            overview['durationSec'] = today_dur
-            overview['avgDuration'] = round(today_dur / max(today_count, 1), 1)
-            # Weekly stats
-            overview['weekCount'] = len(week_events)
-            overview['weekMl'] = round(sum(float(e.get('estimatedMl', 0) or 0) for e in week_events), 1)
-            overview['weekDuration'] = int(sum(parse_duration(e.get('metric','0')) for e in week_events))
-            # Last drink ago
+            events = [ensure_event_fields(e) for e in data.get('events', [])]
+            data["events"] = events
+            # Recalc dynamic fields (lastDrinkAgo changes every minute)
+            overview = data.setdefault('overview', {})
             valid_events = [e for e in events if e.get("label") != "false_positive"]
             if valid_events and valid_events[0].get("end_time"):
                 overview['lastDrinkAgo'] = compute_last_drink_ago(valid_events[0]["end_time"])
             elif not overview.get('lastDrinkAgo'):
                 overview['lastDrinkAgo'] = '等待猫咪饮水...'
-            update_health(overview)
-            _compute_peak_hours(overview, today_events)
-            update_trends(data)
             return self._send_json(data)
         if path == '/api/events':
             data = load_dashboard_data()
@@ -647,15 +705,16 @@ class Handler(SimpleHTTPRequestHandler):
                 event = find_event(data.get('events', []), event_id)
                 if event is None:
                     return self._send_json({'ok': False, 'error': 'Event Not Found'}, 404)
-                return self._send_json({'event': event})
-            return self._send_json({'events': data.get('events', [])})
+                return self._send_json({'event': ensure_event_fields(event)})
+            events = [ensure_event_fields(e) for e in data.get('events', [])]
+            return self._send_json({'events': events})
         if path.startswith('/api/events/'):
             data = load_dashboard_data()
             event_id = path.rsplit('/', 1)[-1]
             event = find_event(data.get('events', []), event_id)
             if event is None:
                 return self._send_json({'ok': False, 'error': 'Event Not Found'}, 404)
-            return self._send_json({'event': event})
+            return self._send_json({'event': ensure_event_fields(event)})
         if path == '/api/settings':
             return self._send_json(load_settings())
         if path == '/api/push-settings':
@@ -688,6 +747,12 @@ class Handler(SimpleHTTPRequestHandler):
             segment_url = parse_qs(parsed.query).get('url', [''])[0]
             if not segment_url:
                 return self._send_json({'ok': False, 'error': 'missing url'}, 400)
+            # SSRF protection: only allow EasyNVR URLs
+            from urllib.parse import urlparse as _urlparse
+            parsed_url = _urlparse(unquote(segment_url))
+            allowed_hosts = (EASYNVR_BASE_URL.replace('http://','').replace('https://','').split(':')[0],)
+            if parsed_url.hostname not in allowed_hosts and not parsed_url.hostname.endswith('.' + allowed_hosts[0]):
+                return self._send_json({'ok': False, 'error': 'url not allowed'}, 403)
             try:
                 return proxy_binary(unquote(segment_url), self)
             except Exception as exc:
@@ -726,99 +791,72 @@ class Handler(SimpleHTTPRequestHandler):
                     end_dt = start_dt + timedelta(seconds=10)
             else:
                 end_dt = start_dt + timedelta(seconds=10)
-            PRE_BUFFER = 35  # seconds before event start (generous for pipeline latency)
-            POST_BUFFER = 8  # seconds after event end
+            PRE_BUFFER = 15
+            POST_BUFFER = 10
             clip_start = start_dt - timedelta(seconds=PRE_BUFFER)
             clip_end = end_dt + timedelta(seconds=POST_BUFFER)
-            date_str = clip_start.strftime('%Y%m%d')
-            time_str = clip_start.strftime('%Y%m%d%H%M%S')
-            rec_dir = Path(f'/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1/{date_str}')
-            if not rec_dir.exists():
-                return self._send_json({'ok': False, 'error': f'no recordings for {date_str}'}, 404)
-            files = sorted(rec_dir.glob('*.mp4'))
-            if not files:
+            clip_duration = max(4, (clip_end - clip_start).total_seconds())
+            # Collect recording files across date boundaries
+            dates = set()
+            d = clip_start
+            while d <= clip_end:
+                dates.add(d.strftime('%Y%m%d'))
+                d += timedelta(days=1)
+            all_files = []
+            for ds in sorted(dates):
+                rec_dir = Path(f'/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1/{ds}')
+                if rec_dir.exists():
+                    for f in sorted(rec_dir.glob('*.mp4')):
+                        if len(f.name) >= 14 and f.name[:14].isdigit():
+                            all_files.append(f)
+            if not all_files:
                 return self._send_json({'ok': False, 'error': 'no recording files found'}, 404)
-            best_file = None
-            for f in files:
-                name = f.name
-                if len(name) >= 14 and name[:14].isdigit():
-                    if name[:14] <= time_str:
-                        best_file = f
-                    else:
-                        break
-            if best_file is None:
-                best_file = files[0]
-            file_ts_str = best_file.name[:14]
-            try:
-                file_start_dt = datetime.strptime(file_ts_str, '%Y%m%d%H%M%S')
-                file_start_dt = file_start_dt.replace(tzinfo=CST)
-            except Exception:
-                file_start_dt = clip_start
+            clip_start_str = clip_start.strftime('%Y%m%d%H%M%S')
+            start_file = None
+            start_file_idx = 0
+            for i, f in enumerate(all_files):
+                if f.name[:14] <= clip_start_str:
+                    start_file = f
+                    start_file_idx = i
+                elif start_file:
+                    break
+            if start_file is None:
+                start_file = all_files[0]
+                start_file_idx = 0
+            file_start_dt = datetime.strptime(start_file.name[:14], '%Y%m%d%H%M%S').replace(tzinfo=CST)
             offset_sec = max(0, (clip_start - file_start_dt).total_seconds())
-            # If clip_start is very close to file start and there's a previous file,
-            # use the previous file to get more pre-event context (e.g. clock drift)
-            prev_idx = files.index(best_file) - 1 if best_file in files else -1
-            if prev_idx >= 0 and offset_sec < 10:
-                prev_file = files[prev_idx]
-                prev_ts = prev_file.name[:14]
-                try:
-                    prev_start = datetime.strptime(prev_ts, '%Y%m%d%H%M%S').replace(tzinfo=CST)
-                    prev_offset = max(0, (clip_start - prev_start).total_seconds())
-                    if 0 <= prev_offset < 65:
-                        best_file = prev_file
-                        offset_sec = prev_offset
-                except Exception:
-                    pass
-            duration_sec = max(4, (clip_end - clip_start).total_seconds())
-            # Hybrid seeking: rough keyframe seek before -i (fast), then fine seek after -i (accurate)
-            rough_ss = max(0, offset_sec - 5)  # seek to 5s before target
-            fine_ss = min(offset_sec, 5)        # fine-tune the remaining 0-5s
-            t = duration_sec + (offset_sec - rough_ss)  # adjust total duration for rough seek offset
-            import subprocess, tempfile, shutil
+            # Gather all files needed from start_file onwards
+            needed_files = [start_file]
+            remaining = clip_duration + offset_sec
+            idx = start_file_idx + 1
+            while remaining > 62 and idx < len(all_files):
+                needed_files.append(all_files[idx])
+                remaining -= 62
+                idx += 1
             tmp = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
             tmp_path = tmp.name
             tmp.close()
-            # Build input list: if clip spans to next file, include both
-            input_files = [str(best_file)]
-            next_idx = files.index(best_file) + 1 if best_file in files else -1
-            next_file_str = None
-            if next_idx < len(files) and (rough_ss + t) > 55:
-                next_file_str = str(files[next_idx])
             try:
-                if next_file_str:
-                    # Two-file concat: extract from both and concatenate
-                    tmp2_path = tmp_path + '.part2.mp4'
-                    # Calculate proper durations: file ~61s, use 57s safe margin
-                    file1_secs = max(1, 57 - rough_ss)
-                    file2_needed = max(1, t - file1_secs)
-                    cmd1 = ['ffmpeg', '-y', '-ss', str(rough_ss), '-i', str(best_file),
-                            '-t', str(file1_secs), '-vf', 'scale=960:-2', '-c:v', 'libx264',
-                            '-preset', 'ultrafast', '-crf', '23', '-an', tmp_path]
-                    cmd2 = ['ffmpeg', '-y', '-i', str(next_file_str),
-                            '-t', str(file2_needed), '-vf', 'scale=960:-2', '-c:v', 'libx264',
-                            '-preset', 'ultrafast', '-crf', '23', '-an', tmp2_path]
-                    proc1 = subprocess.run(cmd1, capture_output=True, timeout=30)
-                    proc2 = subprocess.run(cmd2, capture_output=True, timeout=30)
-                    # Create concat list
-                    list_path = tmp_path + '.list.txt'
-                    with open(list_path, 'w') as f:
-                        f.write(f"file '{tmp_path}'\nfile '{tmp2_path}'\n")
-                    concat_path = tmp_path + '.concat.mp4'
-                    cmd3 = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', list_path,
-                            '-c', 'copy', concat_path]
-                    proc3 = subprocess.run(cmd3, capture_output=True, timeout=15)
-                    shutil.move(concat_path, tmp_path)
-                    for p in [tmp2_path, list_path]:
-                        try: os.unlink(p)
-                        except: pass
-                    proc = proc1  # for error checking below
-                else:
-                    cmd = ['ffmpeg', '-y', '-ss', str(rough_ss), '-i', str(best_file),
-                           '-ss', str(fine_ss), '-t', str(t),
+                if len(needed_files) == 1:
+                    cmd = ['ffmpeg', '-y', '-ss', f'{offset_sec:.3f}', '-i', str(needed_files[0]),
+                           '-t', f'{clip_duration:.3f}',
                            '-vf', 'scale=960:-2', '-c:v', 'libx264',
                            '-preset', 'ultrafast', '-crf', '23', '-an',
                            '-movflags', '+faststart', tmp_path]
                     proc = subprocess.run(cmd, capture_output=True, timeout=30)
+                else:
+                    list_path = tmp_path + '.list.txt'
+                    with open(list_path, 'w') as f:
+                        for nf in needed_files:
+                            f.write(f"file '{nf}'\n")
+                    cmd = ['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', list_path,
+                           '-ss', f'{offset_sec:.3f}', '-t', f'{clip_duration:.3f}',
+                           '-vf', 'scale=960:-2', '-c:v', 'libx264',
+                           '-preset', 'ultrafast', '-crf', '23', '-an',
+                           '-movflags', '+faststart', tmp_path]
+                    proc = subprocess.run(cmd, capture_output=True, timeout=120)
+                    try: os.unlink(list_path)
+                    except: pass
                 if proc.returncode != 0:
                     err_msg = proc.stderr.decode('utf-8', errors='replace')[-200:]
                     Path(tmp_path).unlink(missing_ok=True)
@@ -848,6 +886,7 @@ class Handler(SimpleHTTPRequestHandler):
                 except Exception:
                     pass
             return
+
         if path == '/api/labels/stats':
             stats = load_label_stats()
             stats['total_labeled'] = stats['confirmed'] + stats['false_positive']
@@ -891,9 +930,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        data = load_dashboard_data()
-
         if path == '/api/events':
+            with FILE_LOCK:
+                data = load_dashboard_data(skip_lock=True)
             payload = self._read_request_json()
             if payload is None:
                 return
@@ -956,7 +995,7 @@ class Handler(SimpleHTTPRequestHandler):
             overview['lastDrinkAgo'] = '刚刚'
             update_health(overview)
             update_trends(data)
-            save_dashboard_data(data)
+            save_dashboard_data(data, skip_lock=True)
             return self._send_json({'ok': True, 'event': event, 'overview': overview}, 201)
 
         if path == '/api/fountain-zone':
@@ -983,6 +1022,8 @@ class Handler(SimpleHTTPRequestHandler):
             payload = self._read_request_json()
             if payload is None:
                 return
+            with FILE_LOCK:
+                data = load_dashboard_data(skip_lock=True)
             overview = data.setdefault('overview', {})
             overview['drinkCount'] = payload.get('drink_count', overview.get('drinkCount', 0))
             overview['waterMl'] = payload.get('estimated_total_ml', overview.get('waterMl', 0))
@@ -990,7 +1031,7 @@ class Handler(SimpleHTTPRequestHandler):
             overview['avgDuration'] = payload.get('avg_duration_sec', overview.get('avgDuration', 0))
             overview['lastDrink'] = payload.get('last_drink_time', overview.get('lastDrink', '--:--'))
             overview['lastDrinkAgo'] = '刚刚'
-            save_dashboard_data(data)
+            save_dashboard_data(data, skip_lock=True)
             return self._send_json({'ok': True, 'overview': overview})
 
         if path == '/api/settings':
@@ -1028,6 +1069,8 @@ class Handler(SimpleHTTPRequestHandler):
             label = str(payload.get('label', ''))
             if not event_id or label not in ('confirmed', 'false_positive'):
                 return self._send_json({'ok': False, 'error': '需要 event_id 和 label (confirmed/false_positive)'}, 400)
+            with FILE_LOCK:
+                data = load_dashboard_data(skip_lock=True)
             events = data.get('events', [])
             event = find_event(events, event_id)
             if event is None:
@@ -1064,7 +1107,7 @@ class Handler(SimpleHTTPRequestHandler):
             stats['last_labeled_at'] = datetime.now(CST).isoformat()
             save_label_stats(stats)
             recalc_overview(data)
-            save_dashboard_data(data)
+            save_dashboard_data(data, skip_lock=True)
             stats['total_labeled'] = stats['confirmed'] + stats['false_positive']
             stats['ready_to_train'] = (
                 stats['confirmed'] >= stats['threshold_confirmed'] and
