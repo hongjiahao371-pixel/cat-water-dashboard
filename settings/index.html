@@ -1,48 +1,236 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>设备与规则设置</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--ok:#7aaa54;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.back{color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}h3{font-family:var(--font-heading)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-size:13px;color:var(--muted)}.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:14px;border:1px solid rgba(245,239,224,.08);background:rgba(245,239,224,.04);color:var(--text);font-family:var(--font-body)}.switch{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid rgba(245,239,224,.05)}.switch input{width:18px;height:18px;accent-color:var(--ok)}.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:600;background:var(--brand);color:#fff;cursor:pointer;font-family:var(--font-body);transition:all .2s}.btn:hover{opacity:.9}.note{margin-top:12px;padding:14px 16px;border-radius:16px;background:rgba(212,146,74,.08);border:1px solid rgba(212,146,74,.14);color:#d5cfc4;font-size:13px;line-height:1.6}@media(max-width:900px){.grid{grid-template-columns:1fr}}</style></head><body><div class="wrap"><div class="top"><a class="back" href="/">← 返回面板</a><div style="font-size:28px;font-weight:700;font-family:var(--font-heading)">设备与规则设置</div></div><div class="grid"><div class="card"><div class="inner"><h3 style="margin-top:0">摄像头与 ROI</h3><div class="field"><label>RTSP 地址</label><input id="rtspUrl" value="rtsp://admin:***@192.168.5.30:554/stream1"></div><div class="field"><label>摄像头名称</label><input id="cameraName" value="cat-water-cam-01"></div><div class="field"><label>ROI 配置（JSON）</label><textarea id="roi" rows="6">{
-  "x1": 820,
-  "y1": 540,
-  "x2": 1320,
-  "y2": 980
-}</textarea></div><div class="field"><label>抽帧频率</label><select id="fpsSample"><option value="2">2 FPS</option><option value="1">1 FPS</option><option value="3">3 FPS</option></select></div><button class="btn" id="saveCamera">保存摄像头配置</button><div class="note">后续这里可以直接读取 NAS 上分析程序的配置文件，支持在线更新 ROI 和采样率。</div></div></div><div class="card"><div class="inner"><h3 style="margin-top:0">识别与提醒规则</h3><div class="field"><label>最短饮水事件时长（秒）</label><input id="minPresenceSec" value="3"></div><div class="field"><label>事件合并间隔（秒）</label><input id="mergeGapSec" value="5"></div><div class="field"><label>预估饮水量换算系数（ml/s）</label><input id="mlPerSec" value="0.15"></div><label class="switch"><span>长时间未饮水提醒</span><input id="enableNoDrinkAlert" type="checkbox" checked></label><label class="switch"><span>日报自动推送</span><input id="enableDailyReport" type="checkbox" checked></label><label class="switch"><span>误报人工确认开关</span><input id="enableManualReview" type="checkbox" checked></label><button class="btn" id="saveRules" style="margin-top:14px">保存规则配置</button></div></div></div></div><script>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设备与规则设置</title>
+  <script src="/auth.js"></script>
+  <style>
+    :root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--ok:#7aaa54;--err:#d4735e;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}
+    .wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}.back{color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.wide{grid-column:1/-1}.inner{padding:20px}h3{font-family:var(--font-heading)}.fields{display:grid;grid-template-columns:repeat(2,1fr);gap:0 16px}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-size:13px;color:var(--muted)}.field input,.field textarea,.field select{width:100%;padding:12px 14px;border-radius:14px;border:1px solid rgba(245,239,224,.08);background:rgba(245,239,224,.04);color:var(--text);font-family:var(--font-body)}.switch{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:1px solid rgba(245,239,224,.05)}.switch input{width:18px;height:18px;accent-color:var(--ok)}.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:600;background:var(--brand);color:#fff;cursor:pointer;font-family:var(--font-body)}.btn.secondary{background:rgba(245,239,224,.05);border:1px solid rgba(245,239,224,.08)}.btn:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:12px;flex-wrap:wrap}.note,.status{margin-top:12px;padding:14px 16px;border-radius:16px;background:rgba(212,146,74,.08);border:1px solid rgba(212,146,74,.14);color:#d5cfc4;font-size:13px;line-height:1.65}.status.ok{background:rgba(122,170,84,.08);border-color:rgba(122,170,84,.16);color:#c8e8d0}.status.err{background:rgba(212,115,94,.09);border-color:rgba(212,115,94,.2);color:#f0b8ad}.result{white-space:pre-wrap}
+    @media(max-width:900px){.grid,.fields{grid-template-columns:1fr}.wide{grid-column:auto}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top"><a class="back" href="/">← 返回面板</a><div style="font-size:28px;font-weight:700;font-family:var(--font-heading)">设备与规则设置</div></div>
+    <div class="grid">
+      <div class="card"><div class="inner">
+        <h3 style="margin-top:0">摄像头与 ROI</h3>
+        <div class="field"><label>RTSP 地址</label><input id="rtspUrl"></div>
+        <div class="field"><label>摄像头名称</label><input id="cameraName"></div>
+        <div class="field"><label>ROI 配置（JSON）</label><textarea id="roi" rows="6"></textarea></div>
+        <div class="field"><label>抽帧频率</label><select id="fpsSample"><option value="2">2 FPS</option><option value="1">1 FPS</option><option value="3">3 FPS</option></select></div>
+        <button class="btn" id="saveCamera">保存摄像头配置</button>
+        <div class="note">当前检测程序以饮水机区域、水面线和分类器共同判定；更精细的区域建议在开发者模式中可视化调整。</div>
+      </div></div>
+      <div class="card"><div class="inner">
+        <h3 style="margin-top:0">识别与提醒规则</h3>
+        <div class="field"><label>最短饮水事件时长（秒）</label><input id="minPresenceSec" type="number" min="0" step="0.1"></div>
+        <div class="field"><label>相邻事件自动合并间隔（秒）</label><input id="mergeGapSec" type="number" min="0" step="1"></div>
+        <div class="field"><label>有效舔水换算系数（ml/秒）</label><input id="mlPerActiveSec" type="number" min="0" max="2" step="0.001"></div>
+        <div class="fields">
+          <div class="field"><label>参考下限（ml/秒）</label><input id="mlPerActiveSecLow" type="number" min="0" max="2" step="0.001"></div>
+          <div class="field"><label>参考上限（ml/秒）</label><input id="mlPerActiveSecHigh" type="number" min="0" max="2" step="0.001"></div>
+        </div>
+        <div class="note">只计算高置信、近水、同目标的有效舔水时长，不包含模型保持时间。未做实物校准前使用经验值。</div>
+        <label class="switch"><span>长时间未饮水提醒</span><input id="enableNoDrinkAlert" type="checkbox"></label>
+        <label class="switch"><span>日报自动推送</span><input id="enableDailyReport" type="checkbox"></label>
+        <label class="switch"><span>误报人工确认开关</span><input id="enableManualReview" type="checkbox"></label>
+        <button class="btn" id="saveRules" style="margin-top:14px">保存规则配置</button>
+      </div></div>
+      <div class="card wide"><div class="inner">
+        <h3 style="margin-top:0">饮水量称重校准</h3>
+        <div class="fields">
+          <div class="field"><label>开始时间</label><input id="calibrationStart" type="datetime-local" step="1"></div>
+          <div class="field"><label>结束时间</label><input id="calibrationEnd" type="datetime-local" step="1"></div>
+          <div class="field"><label>开始水重（克）</label><input id="startWeightG" type="number" min="0" step="0.1" placeholder="例如 1850.0"></div>
+          <div class="field"><label>结束水重（克）</label><input id="endWeightG" type="number" min="0" step="0.1" placeholder="例如 1838.5"></div>
+        </div>
+        <label class="switch"><span>应用后重算已有 v2 饮水事件</span><input id="recalculateHistory" type="checkbox" checked></label>
+        <div class="actions" style="margin-top:14px">
+          <button class="btn secondary" id="previewCalibration">计算校准结果</button>
+          <button class="btn" id="applyCalibration" disabled>确认并应用</button>
+        </div>
+        <div class="note">短时间内分别称量饮水设备中的水，系统会自动汇总该时段内已确认事件的有效舔水秒数。1 克水按约 1 ml 计算；期间不要补水、换水或明显洒水，建议覆盖至少 2 次饮水。</div>
+        <div class="status result" id="calibrationStatus">尚未计算。当前仍使用经验系数。</div>
+      </div></div>
+      <div class="card wide"><div class="inner">
+        <h3 style="margin-top:0">安全与模型持续校准</h3>
+        <div id="authSection">
+          <div class="status" id="authStatus">正在检查写接口鉴权…</div>
+          <div class="field" style="margin-top:14px"><label>API 令牌（写操作鉴权密码）</label><input id="apiTokenInput" type="password" placeholder="粘贴 API 令牌后点击验证"></div>
+          <div class="actions">
+            <button class="btn" id="verifyToken">验证并保存令牌</button>
+            <button class="btn secondary" id="copyAuthLink">复制授权链接</button>
+          </div>
+          <div class="note">令牌是部署时在 NAS 的 .env 中设定的写操作密码（形如 ZYGtTuCXZ1dv…）。验证通过后会保存到当前浏览器，后续写操作（保存设置、复核事件等）自动携带。<b>复制授权链接</b>会生成一个带令牌的网址，其他设备打开一次即可完成授权。</div>
+        </div>
+        <div class="status" id="modelTrainingStatus">正在读取本猫模型校准状态…</div>
+        <div class="note">模型持续校准只有在确认/误报样本达到 50/20，并通过交叉验证且不劣于当前阈值时才会自动启用。</div>
+      </div></div>
+    </div>
+  </div>
+<script>
+const byId = id => document.getElementById(id);
+let calibrationReady = false;
+
 function getPayload(){
   return {
-    rtspUrl: document.getElementById('rtspUrl').value,
-    cameraName: document.getElementById('cameraName').value,
-    roi: JSON.parse(document.getElementById('roi').value),
-    fpsSample: Number(document.getElementById('fpsSample').value),
-    minPresenceSec: Number(document.getElementById('minPresenceSec').value),
-    mergeGapSec: Number(document.getElementById('mergeGapSec').value),
-    mlPerSec: Number(document.getElementById('mlPerSec').value),
-    enableNoDrinkAlert: document.getElementById('enableNoDrinkAlert').checked,
-    enableDailyReport: document.getElementById('enableDailyReport').checked,
-    enableManualReview: document.getElementById('enableManualReview').checked
+    rtspUrl: byId('rtspUrl').value,
+    cameraName: byId('cameraName').value,
+    roi: JSON.parse(byId('roi').value),
+    fpsSample: Number(byId('fpsSample').value),
+    minPresenceSec: Number(byId('minPresenceSec').value),
+    mergeGapSec: Number(byId('mergeGapSec').value),
+    mlPerActiveSec: Number(byId('mlPerActiveSec').value),
+    mlPerActiveSecLow: Number(byId('mlPerActiveSecLow').value),
+    mlPerActiveSecHigh: Number(byId('mlPerActiveSecHigh').value),
+    enableNoDrinkAlert: byId('enableNoDrinkAlert').checked,
+    enableDailyReport: byId('enableDailyReport').checked,
+    enableManualReview: byId('enableManualReview').checked
   };
 }
 function fillForm(data){
-  rtspUrl.value=data.rtspUrl||'';
-  cameraName.value=data.cameraName||'';
-  roi.value=JSON.stringify(data.roi||{},null,2);
-  fpsSample.value=String(data.fpsSample||2);
-  minPresenceSec.value=data.minPresenceSec ?? 3;
-  mergeGapSec.value=data.mergeGapSec ?? 5;
-  mlPerSec.value=data.mlPerSec ?? 0.15;
-  enableNoDrinkAlert.checked=Boolean(data.enableNoDrinkAlert);
-  enableDailyReport.checked=Boolean(data.enableDailyReport);
-  enableManualReview.checked=Boolean(data.enableManualReview);
+  byId('rtspUrl').value=data.rtspUrl||'';
+  byId('cameraName').value=data.cameraName||'';
+  byId('roi').value=JSON.stringify(data.roi||{},null,2);
+  byId('fpsSample').value=String(data.fpsSample||2);
+  byId('minPresenceSec').value=data.minPresenceSec ?? 3;
+  byId('mergeGapSec').value=data.mergeGapSec ?? 45;
+  byId('mlPerActiveSec').value=data.mlPerActiveSec ?? 0.45;
+  byId('mlPerActiveSecLow').value=data.mlPerActiveSecLow ?? 0.30;
+  byId('mlPerActiveSecHigh').value=data.mlPerActiveSecHigh ?? 0.70;
+  byId('enableNoDrinkAlert').checked=Boolean(data.enableNoDrinkAlert);
+  byId('enableDailyReport').checked=Boolean(data.enableDailyReport);
+  byId('enableManualReview').checked=Boolean(data.enableManualReview);
+  const calibration=data.volumeCalibration||{};
+  if(calibration.appliedAt){
+    byId('calibrationStatus').textContent='最近校准：'+calibration.appliedAt+'\n水量 '+calibration.waterLossMl+' ml ÷ 有效舔水 '+calibration.activeDrinkSec+' 秒，覆盖 '+calibration.eventCount+' 次事件。';
+    byId('calibrationStatus').className='status result ok';
+  }
 }
 async function load(){
-  const data = await fetch('/api/settings').then(r=>r.json());
+  const data=await fetch('/api/settings').then(r=>r.json());
   fillForm(data);
+  const [auth, training]=await Promise.all([
+    fetch('/api/auth-status',{cache:'no-store'}).then(r=>r.json()),
+    fetch('/api/model-training-status',{cache:'no-store'}).then(r=>r.json())
+  ]);
+  // 鉴权未开启时，隐藏整块鉴权功能区（无需令牌）；开启时才显示并更新状态
+  const authSection = byId('authSection');
+  if(auth.enabled){
+    authSection.style.display='';
+    byId('authStatus').textContent=auth.authenticated?'写接口鉴权已启用，当前浏览器已授权。':'写接口鉴权已启用，但当前浏览器尚未保存令牌。';
+    byId('authStatus').className='status '+(auth.authenticated?'ok':'err');
+    const savedToken = localStorage.getItem('catWaterApiToken') || '';
+    byId('apiTokenInput').placeholder = savedToken ? ('当前已保存令牌（'+savedToken.slice(0,4)+'…'+savedToken.slice(-4)+'），可重新粘贴覆盖') : '粘贴 API 令牌后点击验证';
+    byId('copyAuthLink').disabled = !savedToken;
+  }else{
+    authSection.style.display='none';
+  }
+  const needPositive=Math.max(0,(training.min_confirmed||50)-(training.confirmed||0));
+  const needNegative=Math.max(0,(training.min_false_positive||20)-(training.false_positive||0));
+  byId('modelTrainingStatus').textContent=training.phase==='active'?'本猫分类校准已启用，阈值 '+training.threshold+'。':('当前样本：确认 '+(training.confirmed||0)+' / 误报 '+(training.false_positive||0)+'；还需 '+needPositive+' / '+needNegative+'。状态：'+(training.phase||'未启动'));
+  byId('modelTrainingStatus').className='status '+(training.ok?'ok':'err');
 }
 async function save(){
   let payload;
-  try { payload = getPayload(); } catch (_) { alert('ROI JSON 格式不合法'); return; }
-  const res = await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  const data = await res.json();
-  if(data.ok){ fillForm(data.settings); alert('设置已保存'); return; }
-  alert(data.error || '保存失败');
+  try{payload=getPayload();}catch(_){alert('ROI JSON 格式不合法');return;}
+  const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(data.ok){fillForm(data.settings);alert('设置已保存');return;}
+  alert(data.error||'保存失败');
 }
-document.getElementById('saveCamera').onclick=save;
-document.getElementById('saveRules').onclick=save;
+function calibrationPayload(){
+  return {
+    start_time:byId('calibrationStart').value,
+    end_time:byId('calibrationEnd').value,
+    start_weight_g:Number(byId('startWeightG').value),
+    end_weight_g:Number(byId('endWeightG').value),
+    recalculate_history:byId('recalculateHistory').checked
+  };
+}
+function invalidateCalibration(){
+  calibrationReady=false;
+  byId('applyCalibration').disabled=true;
+}
+async function previewCalibration(){
+  invalidateCalibration();
+  const status=byId('calibrationStatus');
+  status.className='status result';
+  status.textContent='正在核对该时段的已确认事件…';
+  const res=await fetch('/api/volume-calibration/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(calibrationPayload())});
+  const data=await res.json();
+  if(!res.ok){status.className='status result err';status.textContent=data.error||'校准计算失败';return;}
+  const c=data.calibration;
+  const warnings=(c.warnings||[]).map(item=>'\n注意：'+item).join('');
+  status.textContent='称重减少 '+c.water_loss_ml+' ml\n匹配 '+c.event_count+' 次可信饮水，有效舔水 '+c.active_drink_sec+' 秒\n计算系数 '+c.calculated_ml_per_active_sec+' ml/秒'+warnings;
+  status.className='status result '+(c.can_apply?'ok':'err');
+  calibrationReady=Boolean(c.can_apply);
+  byId('applyCalibration').disabled=!calibrationReady;
+}
+async function applyCalibration(){
+  if(!calibrationReady)return;
+  const res=await fetch('/api/volume-calibration/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(calibrationPayload())});
+  const data=await res.json();
+  if(!res.ok){byId('calibrationStatus').className='status result err';byId('calibrationStatus').textContent=data.error||'应用失败';return;}
+  fillForm(data.settings);
+  byId('calibrationStatus').textContent+='\n已应用，并重算 '+data.recalculated_event_count+' 条 v2 事件。';
+  invalidateCalibration();
+}
+// 用原生 fetch（绕过 auth.js 自动注入）校验待保存的令牌是否匹配服务端
+async function verifyAndSaveToken(){
+  const input = byId('apiTokenInput');
+  const value = input.value.trim();
+  if(!value){ alert('请先粘贴 API 令牌'); return; }
+  const btn = byId('verifyToken');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '验证中…';
+  try{
+    // 用原生 XMLHttpRequest 显式带待校验令牌，避免 auth.js 用旧令牌覆盖
+    const ok = await new Promise(resolve=>{
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api/auth-status', true);
+      xhr.setRequestHeader('X-API-Token', value);
+      xhr.onload = ()=>{ try{ resolve(JSON.parse(xhr.responseText).authenticated === true); }catch(_){ resolve(false); } };
+      xhr.onerror = ()=>resolve(false);
+      xhr.send();
+    });
+    if(ok){
+      localStorage.setItem('catWaterApiToken', value);
+      input.value = '';
+      input.placeholder = '当前已保存令牌（'+value.slice(0,4)+'…'+value.slice(-4)+'），验证通过';
+      byId('authStatus').textContent='写接口鉴权已启用，当前浏览器已授权。';
+      byId('authStatus').className='status ok';
+      byId('copyAuthLink').disabled = false;
+      alert('令牌验证通过，已保存到当前浏览器。');
+    }else{
+      alert('令牌不正确，请确认后重试。');
+    }
+  }catch(e){ alert('验证请求失败：'+e.message); }
+  finally{ btn.disabled = false; btn.textContent = old; }
+}
+async function copyAuthLink(){
+  const token = localStorage.getItem('catWaterApiToken') || '';
+  if(!token){ alert('尚未保存令牌，请先验证'); return; }
+  const link = location.origin + '/?token=' + encodeURIComponent(token);
+  try{
+    await navigator.clipboard.writeText(link);
+    alert('授权链接已复制到剪贴板：\n'+link+'\n\n在其他设备浏览器打开一次即可完成授权（令牌会自动保存并从地址栏移除）。');
+  }catch(_){
+    // 剪贴板 API 不可用（如非 HTTPS），退化为弹窗展示供手动复制
+    prompt('请手动复制这条授权链接：', link);
+  }
+}
+['calibrationStart','calibrationEnd','startWeightG','endWeightG','recalculateHistory'].forEach(id=>byId(id).addEventListener('input',invalidateCalibration));
+byId('saveCamera').onclick=save;
+byId('saveRules').onclick=save;
+byId('previewCalibration').onclick=previewCalibration;
+byId('applyCalibration').onclick=applyCalibration;
+byId('verifyToken').onclick=verifyAndSaveToken;
+byId('copyAuthLink').onclick=copyAuthLink;
 load();
-</script></body></html>
+</script>
+</body>
+</html>

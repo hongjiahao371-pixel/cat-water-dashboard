@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Camera drift monitor with auto-sync - called from detection_worker.py."""
-import json, os, base64, hashlib, re as _re
+import json, os, base64, hashlib, re as _re, tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 CAMERA_IP = os.environ.get('CAMERA_IP', '192.168.5.41')
 CAMERA_ONVIF_PORT = int(os.environ.get('CAMERA_ONVIF_PORT', '2020'))
-CAMERA_USER = os.environ.get('CAMERA_USER', 'admin')
-CAMERA_PASS = os.environ.get('CAMERA_PASS', 'Hjh1981940361')
+CAMERA_USER = os.environ.get('CAMERA_USER', '')
+CAMERA_PASS = os.environ.get('CAMERA_PASS', '')
 DRIFT_SYNC_THRESHOLD = float(os.environ.get('DRIFT_SYNC_THRESHOLD', '10'))
 CST = timezone(timedelta(hours=8))
 
@@ -85,6 +85,9 @@ def _sync_camera_time():
 
 def check_camera_drift():
     """Check camera drift, auto-sync if above threshold."""
+    if not CAMERA_USER or not CAMERA_PASS:
+        print('Camera drift: skipped because ONVIF credentials are not configured')
+        return
     try:
         cam_time = _get_camera_time()
         if cam_time is None:
@@ -132,7 +135,15 @@ def check_camera_drift():
             'synced': tag == 'SYNCED'
         })
         history['history'] = history['history'][-100:]
-        offset_file.write_text(json.dumps(history, indent=2))
+        with tempfile.NamedTemporaryFile(
+            mode='w', encoding='utf-8', dir=offset_file.parent,
+            prefix=f'.{offset_file.name}.', suffix='.tmp', delete=False,
+        ) as handle:
+            json.dump(history, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+            tmp_path = Path(handle.name)
+        os.replace(tmp_path, offset_file)
     except Exception as e:
         print("Camera drift check failed: %s" % e)
 

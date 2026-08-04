@@ -5,8 +5,8 @@ from onvif import ONVIFCamera
 
 CAMERA_IP = os.environ.get('CAMERA_IP', '192.168.5.41')
 CAMERA_PORT = int(os.environ.get('CAMERA_ONVIF_PORT', '2020'))
-CAMERA_USER = os.environ.get('CAMERA_USER', 'admin')
-CAMERA_PASS = os.environ.get('CAMERA_PASS', 'admin123')
+CAMERA_USER = os.environ.get('CAMERA_USER', '')
+CAMERA_PASS = os.environ.get('CAMERA_PASS', '')
 DRIFT_WARN = 30
 DRIFT_SYNC = 120
 
@@ -18,6 +18,9 @@ def get_time(cam):
 
 def main():
     print(f"[{datetime.now().isoformat()}] Camera time sync check")
+    if not CAMERA_USER or not CAMERA_PASS:
+        print('  ERROR: CAMERA_USER and CAMERA_PASS must be configured')
+        sys.exit(2)
     try:
         cam = ONVIFCamera(CAMERA_IP, CAMERA_PORT, CAMERA_USER, CAMERA_PASS)
         cam_utc = get_time(cam)

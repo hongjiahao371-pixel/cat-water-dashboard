@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API 契约</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.back{display:inline-block;color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);margin-bottom:18px;transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}pre{padding:16px;border-radius:16px;background:rgba(245,239,224,.03);border:1px solid rgba(245,239,224,.05);overflow:auto;line-height:1.7;color:#d5cfc4}h1{font-family:var(--font-heading)}h3{font-family:var(--font-heading)}.muted{color:var(--muted);font-size:13px}</style></head><body><div class="wrap"><a class="back" href="/">← 返回面板</a><div class="card"><div class="inner"><h1>前后端 API 契约（V1）</h1><p class="muted">这版已经能作为 NAS 本地分析程序的接收面板使用；剩下主要是摄像头接入和算法调参。</p><h3>GET /api/dashboard/overview</h3><pre>{
+<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API 契约</title><style>:root{--bg:#1d1a15;--card:#28241c;--line:rgba(200,180,150,.10);--text:#f5efe0;--muted:#9b8c7d;--brand:#d4924a;--radius:22px;--shadow:0 22px 56px rgba(0,0,0,.34);--font-heading:Georgia,"Noto Serif SC","STSong",serif;--font-body:Inter,"PingFang SC","Microsoft YaHei",sans-serif}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#1d1a15,#1a1712);font-family:var(--font-body);color:var(--text);-webkit-font-smoothing:antialiased}body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px}.wrap{width:min(1100px,calc(100vw - 32px));margin:24px auto;position:relative;z-index:1}.back{display:inline-block;color:var(--text);text-decoration:none;padding:10px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(245,239,224,.04);margin-bottom:18px;transition:all .2s}.back:hover{background:rgba(245,239,224,.08)}.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.inner{padding:20px}pre{padding:16px;border-radius:16px;background:rgba(245,239,224,.03);border:1px solid rgba(245,239,224,.05);overflow:auto;line-height:1.7;color:#d5cfc4}h1{font-family:var(--font-heading)}h3{font-family:var(--font-heading)}.muted{color:var(--muted);font-size:13px}</style></head><body><div class="wrap"><a class="back" href="/">← 返回面板</a><div class="card"><div class="inner"><h1>猫咪饮水监控 API（V2）</h1><p class="muted">当前接口覆盖实时事件、高清复核、自动恢复、每日录像巡检、可信统计和通知状态。</p><h3>GET /api/dashboard/overview</h3><pre>{
   "overview": {
     "drinkCount": 6,
     "waterMl": 38,
@@ -51,17 +51,36 @@
   "fpsSample": 2,
   "minPresenceSec": 3,
   "mergeGapSec": 5,
-  "mlPerSec": 0.15,
+  "mlPerActiveSec": 0.45,
+  "mlPerActiveSecLow": 0.30,
+  "mlPerActiveSecHigh": 0.70,
   "enableNoDrinkAlert": true,
   "enableDailyReport": true,
   "enableManualReview": true
+}</pre><h3>POST /api/volume-calibration/preview</h3><pre>{
+  "start_time": "2026-07-13T08:00:00+08:00",
+  "end_time": "2026-07-13T18:00:00+08:00",
+  "start_weight_g": 1850.0,
+  "end_weight_g": 1838.5
+}</pre><h3>POST /api/volume-calibration/apply</h3><pre>{
+  "start_time": "2026-07-13T08:00:00+08:00",
+  "end_time": "2026-07-13T18:00:00+08:00",
+  "start_weight_g": 1850.0,
+  "end_weight_g": 1838.5,
+  "recalculate_history": true
+}</pre><h3>GET /api/volume-calibrations</h3><pre>{
+  "version": 1,
+  "items": []
 }</pre><h3>GET /api/push-settings</h3><pre>{
-  "openclawWebhook": "http://openclaw.local/api/integrations/openclaw/push",
+  "openclawWebhook": "https://example.com/***",
+  "webhookConfigured": true,
   "pushMode": "日报 + 异常提醒",
   "summaryTemplate": "今日饮水次数：{{drink_count}}",
-  "feishuTarget": "chat:cat-health-report",
+  "feishuTarget": "",
   "noDrinkHours": 8,
   "lowCountPercent": 30,
+  "dailyReportTime": "21:30",
+  "alertCooldownHours": 6,
   "enableFeishuDaily": true,
   "enableFeishuAlert": true,
   "enableLowIntakeAlert": true
@@ -75,4 +94,39 @@
   }
 }</pre><h3>GET /api/push-log</h3><pre>{
   "items": []
+}</pre><h3>GET /api/health</h3><pre>{
+  "pipeline_ok": true,
+  "services": {
+    "archive_verifier": {"ok": true, "phase": "idle"},
+    "notifications": {"ok": true, "phase": "idle", "configured": true},
+    "daily_audit": {"ok": true, "phase": "scanning"}
+  }
+}</pre><h3>GET /api/notification-status</h3><pre>{
+  "ok": true,
+  "phase": "idle",
+  "configured": true,
+  "pending": 0
+}</pre><h3>GET /api/daily-audit-status</h3><pre>{
+  "ok": true,
+  "phase": "idle",
+  "date": "2026-07-12",
+  "files_scanned": 1418,
+  "new_candidates": 0
+}</pre><h3>GET /api/review-candidates</h3><pre>{
+  "counts": {"unlabeled": 0, "drinking": 0, "not_drinking": 0, "no_cat": 0},
+  "items": []
+}</pre><h3>POST /api/review-candidates/label</h3><pre>{
+  "sample_id": "audit-20260712-191132-example",
+  "label": "drinking"
+}</pre><h3>写接口鉴权</h3><pre>X-API-Token: &lt;CAT_WATER_API_TOKEN&gt;
+Authorization: Bearer &lt;CAT_WATER_API_TOKEN&gt;</pre><h3>GET /api/events?include_archived=1&amp;from=2026-01-01&amp;to=2026-12-31</h3><pre>{
+  "events": [],
+  "include_archived": true,
+  "archive": {"archive_files": 0, "archived_events": 0, "retention_days": 90}
+}</pre><h3>GET /api/model-training-status</h3><pre>{
+  "ok": true,
+  "phase": "waiting_data",
+  "confirmed": 14,
+  "false_positive": 2,
+  "ready": false
 }</pre></div></div></div></body></html>

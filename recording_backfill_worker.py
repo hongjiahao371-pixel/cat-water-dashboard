@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import hashlib
 import json
+import math
 import os
 import shutil
 import sqlite3
@@ -25,6 +27,9 @@ BACKFILL_MIN_FILE_MB = float(os.environ.get('BACKFILL_MIN_FILE_MB', '1.5'))
 BACKFILL_MAX_PROCESSED_TRACK = int(os.environ.get('BACKFILL_MAX_PROCESSED_TRACK', '500'))
 BACKFILL_USE_FFMPEG = os.environ.get('BACKFILL_USE_FFMPEG', '1') == '1'
 BACKFILL_HWACCEL_MODE = os.environ.get('BACKFILL_HWACCEL_MODE', 'qsv').lower()
+BACKFILL_WRITE_EVENTS = os.environ.get('BACKFILL_WRITE_EVENTS', 'false').lower() == 'true'
+BACKFILL_EVENT_END_GAP_SEC = float(os.environ.get('BACKFILL_EVENT_END_GAP_SEC', '5'))
+BACKFILL_CONFIRMATION_SEC = float(os.environ.get('BACKFILL_CONFIRMATION_SEC', '0.6'))
 FFMPEG_BIN = os.environ.get('FFMPEG_BIN', 'ffmpeg')
 FFPROBE_BIN = os.environ.get('FFPROBE_BIN', 'ffprobe')
 
@@ -38,7 +43,20 @@ def now_iso():
 
 def write_status(payload):
     payload.setdefault('updated_at', now_iso())
-    BACKFILL_STATUS_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    payload.setdefault('updated_unix', time.time())
+    _write_json_atomic(BACKFILL_STATUS_FILE, payload)
+
+
+def _write_json_atomic(path, payload):
+    with tempfile.NamedTemporaryFile(
+        mode='w', encoding='utf-8', dir=path.parent,
+        prefix=f'.{path.name}.', suffix='.tmp', delete=False,
+    ) as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+        handle.flush()
+        os.fsync(handle.fileno())
+        tmp_path = Path(handle.name)
+    os.replace(tmp_path, path)
 
 
 def read_json(path, default):
@@ -56,7 +74,7 @@ def save_state(state):
     if len(processed) > BACKFILL_MAX_PROCESSED_TRACK:
         items = sorted(processed.items(), key=lambda item: item[1].get('processed_at', ''))
         state['processed'] = dict(items[-BACKFILL_MAX_PROCESSED_TRACK:])
-    BACKFILL_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
+    _write_json_atomic(BACKFILL_STATE_FILE, state)
 
 
 def parse_any_datetime(value):
@@ -265,45 +283,153 @@ def ffmpeg_extract_frames(source_path, fps):
     return None, [], 'opencv'
 
 
-class BackfillDetector(detector_mod.Detector):
+def backfill_confirm_frames(sample_fps=None):
+    """Keep confirmation time stable when replay sampling differs from live FPS."""
+    fps = float(sample_fps or BACKFILL_ANALYZE_FPS)
+    return max(1, int(math.ceil(max(0.0, BACKFILL_CONFIRMATION_SEC) * max(fps, 0.1))))
+
+
+class BackfillDetector:
+    """Replay the same classifier/geometry gates used by the live worker."""
+
     def __init__(self, source_label=''):
-        super().__init__()
+        self.detector = detector_mod.CatDetector()
         self.source_label = source_label
         self.posted_events = []
+        self.active_since = None
+        self.last_positive_at = None
+        self.peak_confidence = 0.0
+        self.peak_cat_score = 0.0
+        self.peak_frame = None
+        self.profile = 'day'
+        self.trigger_source = ''
+        self._cat_consecutive = 0
 
-    def post_event(self, event_id, start_ts, end_ts, peak_frame, settings):
-        duration = max(1.0, end_ts - start_ts)
-        estimated_ml = round(duration * float(settings.get('mlPerSec', 0.14) or 0.14), 1)
-        snapshot_url = self.save_snapshot(peak_frame or self.last_frame, event_id)
-        started = datetime.fromtimestamp(start_ts).astimezone()
-        ended = datetime.fromtimestamp(end_ts).astimezone()
-        confidence = min(0.98, 0.55 + min(duration / 35.0, 0.22) + min(self.event_peak_score / 140.0, 0.15))
-        summary = f'录像补检发现猫在饮水机附近持续停留 {duration:.1f} 秒；当前基于猫检测 + 低头候选 + 占用/运动规则回放得出。'
-        debug_curve_url = self.save_debug_curve(event_id, start_ts, end_ts)
-        payload = {
-            'id': event_id,
-            'title': f"{started.strftime('%H:%M:%S')} - {ended.strftime('%H:%M:%S')} · 录像补检疑似喝水事件",
-            'summary': summary,
-            'start_time': started.isoformat(timespec='seconds'),
-            'end_time': ended.isoformat(timespec='seconds'),
-            'duration_sec': round(duration, 1),
-            'estimated_ml': estimated_ml,
-            'confidence': round(confidence, 2),
-            'snapshot_url': snapshot_url,
-            'tag': '录像补检',
-            'debug_curve_url': debug_curve_url,
-        }
-        detector_mod.post_json('/api/events', payload)
-        self.posted_events.append({'id': event_id, 'start_time': payload['start_time'], 'end_time': payload['end_time']})
-        self.last_posted_at = end_ts
+    def _detect_drinking(self, frame, settings):
+        height, width = frame.shape[:2]
+        fountain_zone = detector_mod.get_fountain_zone(settings, width, height)
+        water_zone = detector_mod.get_water_zone(settings, width, height)
+        result = self.detector.detect(frame, force=True, fzone=fountain_zone, wzone=water_zone)
+        cat_box = result.get('cat_box', [])
+        night_mode = bool(result.get('night_mode', detector_mod.is_night_mode(frame)))
+        has_cat_candidate = bool(cat_box and len(cat_box) == 4)
+        self._cat_consecutive = self._cat_consecutive + 1 if has_cat_candidate else 0
+        if (not has_cat_candidate or self._cat_consecutive < backfill_confirm_frames() or
+                not water_zone):
+            return False, 0.0, '', result
+
+        threshold = (detector_mod.NIGHT_DRINKING_CLASSIFIER_THRESHOLD if night_mode
+                     else detector_mod.DRINKING_CLASSIFIER_THRESHOLD)
+        geometric_floor = (detector_mod.NIGHT_GEOMETRIC_CLASSIFIER_FLOOR if night_mode
+                           else detector_mod.GEOMETRIC_CLASSIFIER_FLOOR)
+        classifier_drinking = False
+        confidence = 0.0
+        source = ''
+        if self.detector._drink_clf_session is not None:
+            predicted, confidence = self.detector.classify_drinking(frame, cat_box, threshold=threshold)
+            if predicted:
+                mouth_x, mouth_y = detector_mod.estimate_mouth_point(cat_box, water_zone)
+                mouth_near = (water_zone[0] - 70 <= mouth_x <= water_zone[2] + 70 and
+                              water_zone[1] - 80 <= mouth_y <= water_zone[3] + 90)
+                if mouth_near or result.get('closeup_water', False):
+                    classifier_drinking = True
+                    source = 'classifier' if mouth_near else 'classifier_closeup'
+
+        geometric_drinking = False
+        if not classifier_drinking and (self.detector._drink_clf_session is None or confidence >= geometric_floor):
+            mouth_x, mouth_y = detector_mod.estimate_mouth_point(cat_box, water_zone)
+            water_surface_y = settings.get('waterSurfaceY')
+            _, _, posture_ratio = detector_mod.box_metrics(cat_box)
+            if water_surface_y:
+                scale_y = height / max(1, settings.get('frameHeight', height))
+                scaled_water_y = float(water_surface_y) * scale_y
+                in_water_x = water_zone[0] - 30 <= mouth_x <= water_zone[2] + 30
+                head_at_water = (scaled_water_y - detector_mod.WATER_PROXIMITY_PX * 0.4) <= mouth_y <= (scaled_water_y + detector_mod.WATER_PROXIMITY_PX)
+                geometric_drinking = in_water_x and head_at_water and posture_ratio >= detector_mod.DRINKING_POSTURE_MIN_RATIO
+                source = 'geometric' if geometric_drinking else source
+            else:
+                wx1, wy1, wx2, wy2 = water_zone
+                ix1, iy1 = max(cat_box[0], wx1), max(cat_box[1], wy1)
+                ix2, iy2 = min(cat_box[2], wx2), min(cat_box[3], wy2)
+                overlap = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+                box_area = max(1, (cat_box[2] - cat_box[0]) * (cat_box[3] - cat_box[1]))
+                geometric_drinking = overlap / box_area > 0.15 and posture_ratio >= detector_mod.DRINKING_POSTURE_MIN_RATIO
+                source = 'geometric_overlap' if geometric_drinking else source
+
+        return classifier_drinking or geometric_drinking, confidence, source, result
+
+    def observe(self, frame, ts, settings):
+        drinking, confidence, source, result = self._detect_drinking(frame, settings)
+        if drinking:
+            if self.active_since is None:
+                self.active_since = ts
+            self.last_positive_at = ts
+            self.peak_confidence = max(self.peak_confidence, confidence)
+            self.peak_cat_score = max(self.peak_cat_score, float(result.get('cat_score', 0) or 0))
+            if self.peak_frame is None or confidence >= self.peak_confidence:
+                self.peak_frame = frame.copy()
+            self.profile = 'night' if result.get('night_mode') else 'day'
+            self.trigger_source = source or self.trigger_source
+            return
+        if self.active_since is not None and self.last_positive_at is not None:
+            if ts - self.last_positive_at > BACKFILL_EVENT_END_GAP_SEC:
+                self.finalize(ts, settings)
+
+    def finalize(self, ts, settings, force=False):
+        if self.active_since is None or self.last_positive_at is None:
+            return
+        if not force and ts - self.last_positive_at <= BACKFILL_EVENT_END_GAP_SEC:
+            return
+        start_ts = self.active_since
+        end_ts = self.last_positive_at
+        duration = max(0.0, end_ts - start_ts)
+        required = detector_mod.trigger_min_duration(self.trigger_source or 'unknown', self.profile == 'night')
+        if duration >= required:
+            digest = hashlib.sha1(f'{self.source_label}:{start_ts:.3f}'.encode('utf-8')).hexdigest()[:10]
+            event_id = f"backfill-{datetime.fromtimestamp(start_ts).strftime('%Y%m%d-%H%M%S')}-{digest}"
+            snapshot_url = ''
+            if BACKFILL_WRITE_EVENTS and self.peak_frame is not None:
+                snapshot_path = detector_mod.EVENT_DIR / f'snap-{event_id}.jpg'
+                if cv2.imwrite(str(snapshot_path), self.peak_frame, [cv2.IMWRITE_JPEG_QUALITY, 85]):
+                    snapshot_url = f'/media/events/{snapshot_path.name}'
+            started = datetime.fromtimestamp(start_ts).astimezone().isoformat(timespec='seconds')
+            ended = datetime.fromtimestamp(end_ts).astimezone().isoformat(timespec='seconds')
+            payload = {
+                'event_id': event_id,
+                'title': f'录像补检 · {datetime.fromtimestamp(start_ts).strftime("%H:%M:%S")}',
+                'summary': f'录像回放已通过实时相同的分类器/几何门槛，持续 {duration:.1f} 秒。',
+                'start_time': started,
+                'end_time': ended,
+                'duration_sec': round(duration, 1),
+                'estimated_ml': round(duration * float(settings.get('mlPerSec', 0.14) or 0.14), 1),
+                'confidence': self.peak_confidence or self.peak_cat_score,
+                'cat_confidence': round(self.peak_cat_score, 3),
+                'drinking_confidence': round(self.peak_confidence, 3),
+                'snapshot_url': snapshot_url,
+                'tag': '录像补检',
+                'trigger_source': self.trigger_source,
+                'profile': self.profile,
+            }
+            if BACKFILL_WRITE_EVENTS:
+                detector_mod.post_json('/api/events', payload)
+            self.posted_events.append({
+                'id': event_id,
+                'start_time': started,
+                'end_time': ended,
+                'duration_sec': round(duration, 1),
+                'dry_run': not BACKFILL_WRITE_EVENTS,
+            })
+        self.active_since = None
+        self.last_positive_at = None
+        self.peak_confidence = 0.0
+        self.peak_cat_score = 0.0
+        self.peak_frame = None
+        self.profile = 'day'
+        self.trigger_source = ''
 
 
 def replay_frame(detector, frame, ts, settings):
-    detector.frame_shape = frame.shape[:2]
-    detector.last_frame = frame
-    occupied, annotated, score = detector.analyze_frame(frame, settings)
-    detector.handle_presence(occupied, score, annotated, ts, settings)
-    detector.maybe_finish_event(ts, settings)
+    detector.observe(frame, ts, settings)
 
 
 def analyze_clip(candidate):
@@ -314,7 +440,6 @@ def analyze_clip(candidate):
     if clip_start_dt is None:
         clip_start_dt = datetime.fromtimestamp(source_path.stat().st_mtime).astimezone()
     clip_start_ts = clip_start_dt.timestamp()
-    detector_mod.STREAM_URL = str(source_path)
     detector = BackfillDetector(source_label=str(source_path))
     settings = detector_mod.read_settings()
     meta = {'fps': 25.0, 'duration_sec': 0.0, 'width': 0, 'height': 0}
@@ -363,7 +488,7 @@ def analyze_clip(candidate):
                     frame_index += 1
             finally:
                 cap.release()
-        detector.maybe_finish_event(last_ts + float(settings.get('mergeGapSec', 6) or 6) + 0.2, settings)
+        detector.finalize(last_ts + BACKFILL_EVENT_END_GAP_SEC + 0.2, settings, force=True)
     finally:
         if temp_dir:
             shutil.rmtree(temp_dir, ignore_errors=True)
@@ -372,7 +497,9 @@ def analyze_clip(candidate):
     return {
         'ok': True,
         'detail': f'analysis complete via {mode}',
-        'events_found': len(detector.posted_events),
+        'events_found': len(detector.posted_events) if BACKFILL_WRITE_EVENTS else 0,
+        'candidates_found': len(detector.posted_events),
+        'write_events': BACKFILL_WRITE_EVENTS,
         'events': detector.posted_events,
         'sampled_frames': sampled,
         'fps': round(meta.get('fps') or 25.0, 2),
@@ -407,7 +534,8 @@ def worker_loop():
             except Exception:
                 continue
             mark = processed.get(str(path))
-            if mark and mark.get('mtime') == stat.st_mtime and mark.get('size') == stat.st_size:
+            if (mark and mark.get('mtime') == stat.st_mtime and mark.get('size') == stat.st_size and
+                    bool(mark.get('write_events', False)) == BACKFILL_WRITE_EVENTS):
                 continue
             if stat.st_size < BACKFILL_MIN_FILE_MB * 1024 * 1024:
                 continue
@@ -424,6 +552,7 @@ def worker_loop():
                 'record_db': str(EASYNVR_DB_PATH),
                 'record_root': str(EASYNVR_RECORD_ROOT),
                 'hwaccel_mode': BACKFILL_HWACCEL_MODE,
+                'write_events': BACKFILL_WRITE_EVENTS,
             })
         elif not pending:
             write_status({
@@ -436,6 +565,7 @@ def worker_loop():
                 'record_db': str(EASYNVR_DB_PATH),
                 'record_root': str(EASYNVR_RECORD_ROOT),
                 'hwaccel_mode': BACKFILL_HWACCEL_MODE,
+                'write_events': BACKFILL_WRITE_EVENTS,
             })
         else:
             for index, (path, item, stat) in enumerate(pending, start=1):
@@ -450,6 +580,7 @@ def worker_loop():
                     'record_db': str(EASYNVR_DB_PATH),
                     'record_root': str(EASYNVR_RECORD_ROOT),
                     'hwaccel_mode': BACKFILL_HWACCEL_MODE,
+                    'write_events': BACKFILL_WRITE_EVENTS,
                 })
                 result = analyze_clip(item)
                 processed[str(path)] = {
@@ -458,9 +589,11 @@ def worker_loop():
                     'processed_at': now_iso(),
                     'source': item.get('source', ''),
                     'events_found': result.get('events_found', 0),
+                    'candidates_found': result.get('candidates_found', 0),
+                    'write_events': bool(result.get('write_events', False)),
                     'decode_mode': result.get('decode_mode', ''),
                 }
-                if result.get('events'):
+                if result.get('write_events') and result.get('events'):
                     state['last_event_at'] = result['events'][-1]['end_time']
                 save_state(state)
                 write_status({
@@ -476,6 +609,7 @@ def worker_loop():
                     'record_db': str(EASYNVR_DB_PATH),
                     'record_root': str(EASYNVR_RECORD_ROOT),
                     'hwaccel_mode': BACKFILL_HWACCEL_MODE,
+                    'write_events': BACKFILL_WRITE_EVENTS,
                 })
         state['last_scan_at'] = now_iso()
         save_state(state)

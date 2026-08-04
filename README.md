@@ -5,34 +5,49 @@
 ## 架构
 
 ```
-RTSP摄像头 → QSV转码(960px/8fps) → 运动检测预过滤 → YOLOv8 ONNX推理
-                                         ↓
-                                   饮水状态机(>3s触发事件)
-                                         ↓
-                              Flask仪表盘 + EasyNVR录像回放
+摄像头 / EasyNVR 低清流 → 转码 → YOLOv8 猫检测 → 饮水分类器与时序门
+                                                        ↓
+                                     实时事件 / 不确定候选
+                                                        ↓
+                       EasyNVR 高清录像复核 → 已确认统计 / 排除 / 人工审核
 ```
 
 ### 服务
 
 | 服务 | 端口 | 功能 |
 |------|------|------|
-| cat-water-dashboard | 39095 | Flask Web 仪表盘，事件管理，录像回放 API |
+| cat-water-dashboard | 39095 | Web 仪表盘，事件管理，录像回放与健康 API |
 | cat-water-detector | - | YOLOv8 ONNX 实时推理，饮水状态机，事件生成 |
 | cat-water-camera | - | RTSP 定时抓帧 |
 | cat-water-qsv-transcode | 39100 | RTSP → FLV 转码 (CPU编码, 960px/8fps) |
-| cat-water-backfill | - | 离线录像回溯检测 (已停用) |
+| cat-water-archive-verifier | - | EasyNVR 高清录像二次复核和漏检候选恢复 |
+| cat-water-notifier | - | 日报、未饮水和低饮水提醒，带去重与失败重试 |
+| cat-water-daily-audit | - | 凌晨先做关键帧预筛，再用低频强证据门和 2 FPS 精校扫描前一日高清录像，发现实时阶段完全遗漏的候选 |
+| cat-water-model-trainer | - | 持续检查人工样本，达到门槛后交叉验证并安全发布本猫分类阈值校准 |
+| cat-water-backfill | - | 离线录像回溯检测（`maintenance` profile 手动启用） |
 
 ### 检测管线
 
 - **模型**: YOLOv8n COCO (640×640, ONNX)
 - **运动预过滤**: 320×180 灰度帧差, 阈值 6.0
 - **两轮检测**: 全帧(0.40) + 底部裁剪(0.25)
-- **饮水判定**: 猫靠近饮水机 + (猫可见 OR 水面占用) → 持续 >3s 触发事件
-- **夜间模式**: 自动 HSV 检测, 4-pass 多尺度推理, CLAHE 增强
+- **饮水判定**: 分类器达到日/夜阈值且位于饮水区候选范围；需要连续帧确认。无分类器时才使用严格几何判定。
+- **证据保留**: 确认事件会写入快照、叠加标注短片和帧级元数据；旧事件可从 EasyNVR 录像动态提取。
+- **高清复核**: 实时事件结束后从 EasyNVR 高清录像取证，只有同一空间目标的重复高置信锚点才确认。
+- **漏检恢复**: 未形成事件的边界候选会自动进入高清探测；确认前不计入统计，也不会自动写成训练标签。
+- **每日巡检**: 每天 03:30 对前一日 EasyNVR 高清录像做低频预筛和 2 FPS 严格复核；新发现只进入审核队列，人工确认后才计入统计。
+- **统计口径**: 只统计人工确认或高清确认事件；历史未复核记录保留但从趋势和汇总隔离。
+- **饮水量估算**: 使用高置信舔水锚点形成的有效舔水时长乘以可配置 ml/s，并显示参考范围；设置页可根据一段称重区间内的可信事件自动计算本猫系数，并选择重算已有 v2 事件。
+- **消息提醒**: 支持通用 JSON Webhook 和飞书自定义机器人 Webhook；日报、长时间未饮水、低于近 7 日基线和录像巡检新候选提醒均有去重、冷却和最多 5 次重试。
+- **写接口安全**: 配置 `CAT_WATER_API_TOKEN` 后，所有 POST 接口必须携带 `X-API-Token` 或 Bearer Token；访问一次 `/?token=...` 可将令牌安全保存到当前浏览器并立即从地址栏移除。
+- **长期归档**: 活动事件超过保留期后按日期写入 `data/events_archive/`；历史页和 `include_archived=1` API 可以跨活动与归档文件查询。
+- **持续校准**: 标签达到 50 个确认和 20 个误报后，NAS 自动执行分层交叉验证；只有精确率、召回率和相对基线同时达标才写入校准文件，检测器会自动热读取。
+- **夜间模式**: 自动 HSV 检测和 CLAHE 增强。夜间 ROI 与模型必须用真实 IR 样本校准，不能只靠降低阈值。
+- **运行健康**: 相机、转码和检测器均写入带时间戳的状态文件；`/api/health` 会报告整条实时管线是否可用。
 
 ## 部署
 
-要求: Docker + Intel GPU (/dev/dri) 用于硬件加速编码 (QSV 不可用时回退 CPU)
+要求: Docker；Intel GPU `/dev/dri` 为可选加速，驱动不可用时自动使用 CPU
 
 ```bash
 # 1. 准备 YOLOv8n ONNX 模型
@@ -60,24 +75,50 @@ docker compose up -d
 | `DETECTOR_MOTION_THRESHOLD` | 6.0 | 运动检测阈值 |
 | `PERSON_REJECTION_ENABLED` | true | 人物排斥开关 |
 | `PERSON_SCORE_REJECT_THRESHOLD` | 0.30 | 人物排斥阈值 |
-| `CONSECUTIVE_FRAMES_REQUIRED` | 2 | 连续确认帧数 |
+| `CONSECUTIVE_FRAMES_REQUIRED` | 3 | 连续确认帧数 |
+| `ARCHIVE_AUTO_RECOVERY_ENABLED` | true | 自动对未标注边界候选做高清探测 |
+| `ARCHIVE_AUTO_RECOVERY_MIN_CONFIDENCE` | 0.15 | 自动高清探测最低实时分类置信度 |
+| `DAILY_AUDIT_RUN_TIME` | 03:30 | 每日录像巡检开始时间 |
+| `DAILY_AUDIT_PREFILTER_INTERVAL_SEC` | 10 | 高清录像第一阶段抽样间隔；命中后升至 2 FPS 复核 |
+| `DAILY_AUDIT_MOTION_THRESHOLD` | 12 | 静态机位背景差分阈值；每分钟仍强制一次 YOLO 检查 |
+| `NOTIFICATION_POLL_SEC` | 60 | 通知规则检查间隔 |
+| `CAT_WATER_API_TOKEN` | 空 | 写接口鉴权令牌；生产环境必须设置 |
+| `MODEL_TRAINING_MIN_POSITIVE` | 50 | 自动分类阈值校准所需最少确认样本 |
+| `MODEL_TRAINING_MIN_NEGATIVE` | 20 | 自动分类阈值校准所需最少误报样本 |
 
 详见 `detection_worker.py` 顶部完整配置列表。
+
+## 生产验证
+
+- 2026-07-13 对 2026-07-12 的 EasyNVR 留存录像完成全日回扫：1418 个一分钟文件、8508 个预筛帧、0 个解码或分析错误。
+- 23 个文件进入 1 FPS 时序门，9 个文件进入 2 FPS 精校；已知事件按录像锚点或实际开始时间去重。
+- 原始候选按活动区间跨文件归并后，人工视觉确认 5 次实时阶段完全遗漏的饮水；当日可信统计由 5 次 / 68.6 ml 更新为 10 次 / 170.7 ml（视频估算，尚未针对本猫称重标定）。
+- 通知发送已用临时 Webhook 完成端到端验证；生产 Webhook 留空时服务保持健康但不对外发送。
+- 称重校准接口已用当日 10 次可信事件、379.4 秒有效舔水做只读预览验证，正确计算 0.45 ml/秒；未应用测试结果或改写生产统计。
+- 2026-07-13 安全、长期归档、巡检候选提醒和持续模型校准闭环补齐后，本地回归扩展为 47 项。
 
 ## 页面
 
 | 路径 | 功能 |
 |------|------|
 | `/` | 仪表盘 — 实时状态、今日摘要、饮水趋势、事件日历 |
-| `/events/` | 事件详情 — 快照、检测指标、EasyNVR 录像回放 |
-| `/data/dev.html` | 开发者模式 — ROI 编辑器、模型管理、系统诊断 |
-| `/push/` | 推送配置 |
-| `/settings/` | 设备设置 |
+| `/events/` | 活动与长期归档事件查询；带 id 时显示快照、检测指标和 EasyNVR 录像回放 |
+| `/api/transcode-status` | 转码连接、重连和存活状态 |
+| `/settings/` | 设备设置、饮水量称重校准与历史 v2 事件重算 |
+| `/review/` | 边界候选审核与自动高清恢复状态 |
+| `/push/` | Webhook、日报和异常提醒策略及测试发送 |
+| `/api/health` | 实时检测与高清复核链路健康状态 |
+| `/api/notification-status` | 通知配置、重试队列和最近发送状态 |
+| `/api/daily-audit-status` | 每日录像巡检进度和结果摘要 |
+| `/api/model-training-status` | 本猫分类阈值持续校准状态、样本门槛和交叉验证结果 |
+| `/api/events?include_archived=1` | 跨活动数据与日期归档查询历史事件 |
+| `/api/events/archive-status` | 长期归档文件、数量和日期范围 |
+| `/api/volume-calibrations` | 最近 50 次饮水量校准记录 |
 | `/api/` | API 参考 |
 
 ## 技术栈
 
 - Python 3.9+, OpenCV, ONNX Runtime
 - YOLOv8n COCO (80类, 640×640)
-- Flask + HTML/CSS/JS (Claude Design 风格)
+- Python `ThreadingHTTPServer` + HTML/CSS/JS
 - Docker Compose 部署

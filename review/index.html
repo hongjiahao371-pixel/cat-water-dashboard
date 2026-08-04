@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>猫咪饮水 · 样本审核</title>
+  <script src="/auth.js"></script>
+  <style>
+    :root{--bg:#f5f0e8;--card:#fffaf2;--ink:#2d2926;--muted:#756d65;--line:#ddd2c4;--amber:#bd6b2c;--green:#51705a;--red:#9a4f43}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:1180px;margin:auto;padding:28px 20px 60px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}
+    h1{margin:0;font:700 30px/1.2 Georgia,"Noto Serif SC",serif}.sub{color:var(--muted);margin:8px 0 0}.back{color:var(--amber);text-decoration:none;font-weight:650}
+    .summary,.filters{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}.pill,.filter{border:1px solid var(--line);border-radius:999px;padding:8px 13px;background:#fff8ee}
+    .filter{cursor:pointer;color:var(--muted)}.filter.active{background:var(--ink);color:white;border-color:var(--ink)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 8px 24px #5d493315}
+    .images{display:grid;grid-template-columns:2fr 1fr;height:220px;background:#ded6cb}.images img{width:100%;height:100%;object-fit:cover}.images img+img{border-left:2px solid var(--card)}
+    .body{padding:16px}.meta{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:13px}.score{margin:10px 0 14px;font-variant-numeric:tabular-nums}
+    .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.actions button{border:1px solid var(--line);border-radius:11px;padding:10px 6px;background:white;cursor:pointer;font-weight:650}
+    .actions button:hover{border-color:var(--amber)}.actions button.selected{background:var(--green);border-color:var(--green);color:white}.actions button[data-label="no_cat"].selected{background:var(--red);border-color:var(--red)}
+    .empty{grid-column:1/-1;text-align:center;padding:70px 20px;border:1px dashed var(--line);border-radius:18px;color:var(--muted)}.error{color:var(--red)}
+    @media(max-width:620px){main{padding:20px 12px}.images{height:190px}.actions{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><main>
+  <div class="top"><div><h1>样本审核</h1><p class="sub">边界候选会自动用 EasyNVR 高清录像复核；只有高清或人工确认后才计入饮水统计。</p></div><a class="back" href="/">返回监控首页</a></div>
+  <div id="summary" class="summary"></div>
+  <div id="filters" class="filters"></div>
+  <div id="grid" class="grid"><div class="empty">正在读取候选样本…</div></div>
+</main><script>
+const labels={unlabeled:'未标注',drinking:'正在喝水',not_drinking:'有猫未喝',no_cat:'无猫'};
+let queue={items:[],counts:{}},filter='unlabeled';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function load(){try{const r=await fetch('/api/review-candidates',{cache:'no-store'});if(!r.ok)throw Error(`HTTP ${r.status}`);queue=await r.json();render()}catch(e){document.querySelector('#grid').innerHTML=`<div class="empty error">读取失败：${esc(e.message)}</div>`}}
+function render(){
+  const counts=queue.counts||{};
+  document.querySelector('#summary').innerHTML=Object.keys(labels).map(k=>`<span class="pill">${labels[k]} <b>${counts[k]||0}</b></span>`).join('');
+  document.querySelector('#filters').innerHTML=['unlabeled','drinking','not_drinking','no_cat','all'].map(k=>`<button class="filter ${filter===k?'active':''}" onclick="setFilter('${k}')">${k==='all'?'全部':labels[k]}</button>`).join('');
+  const items=(queue.items||[]).filter(x=>filter==='all'||(x.label||'unlabeled')===filter).sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  document.querySelector('#grid').innerHTML=items.length?items.map(card).join(''):`<div class="empty">当前没有“${filter==='all'?'全部':labels[filter]}”样本。</div>`;
+}
+const recoveryLabels={pending:'高清复核中',confirmed:'高清确认喝水',rejected:'高清未确认',uncertain:'需人工判断',error:'复核失败',covered_confirmed:'已有事件已确认',covered_rejected:'已有事件已排除',covered_pending:'已有事件待复核',covered_uncertain:'已有事件需人工判断',covered_unverified:'已有旧事件未复核'};
+function card(x){const label=x.label||'';const audit=x.source==='nightly_archive_audit';const origin=audit?'每日高清巡检':(x.profile==='night'?'夜间实时':'日间实时');const recovery=x.recovery_event_id?` · ${x.recovery_trigger==='automatic_archive_probe'?'自动高清':(x.recovery_trigger==='daily_archive_audit'?'巡检恢复':'人工恢复')} <b>${esc(recoveryLabels[x.recovery_status]||x.recovery_status||'复核中')}</b>`:(audit?' · <b>高清强证据待人工</b>':'');return `<article class="card"><div class="images"><img loading="lazy" src="${esc(x.snapshot_url)}" alt="完整画面"><img loading="lazy" src="${esc(x.crop_url)}" alt="猫咪局部"></div><div class="body"><div class="meta"><span>${esc(x.created_at||'--')}</span><span>${origin}</span></div><div class="score">饮水置信度 <b>${Number(x.classifier_confidence||0).toFixed(3)}</b> · 猫 <b>${Number(x.cat_confidence||0).toFixed(3)}</b>${recovery}</div><div class="actions">${button(x.id,'drinking','喝水',label)}${button(x.id,'not_drinking','有猫未喝',label)}${button(x.id,'no_cat','无猫',label)}</div></div></article>`}
+function button(id,value,text,current){return `<button data-label="${value}" class="${current===value?'selected':''}" onclick="mark('${esc(id)}','${value}',this)">${text}</button>`}
+function setFilter(value){filter=value;render()}
+async function mark(id,label,button){button.disabled=true;try{const r=await fetch('/api/review-candidates/label',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sample_id:id,label})});const data=await r.json();if(!r.ok)throw Error(data.error||`HTTP ${r.status}`);queue=data.queue;render()}catch(e){alert(`保存失败：${e.message}`);button.disabled=false}}
+load();
+</script></body></html>

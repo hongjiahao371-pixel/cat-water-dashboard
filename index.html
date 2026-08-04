@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>猫咪饮水监控面板</title>
+  <script src="/auth.js"></script>
   <style>
     :root{
       --bg:#faf7f2;
@@ -155,7 +156,7 @@
       display:flex;
       flex-direction:column;
       justify-content:space-between;
-      background:linear-gradient(180deg,rgba(42,36,25,.70),rgba(42,36,25,.30) 40%,rgba(42,36,25,.05) 100%);
+      background:linear-gradient(180deg,rgba(42,36,25,.50) 0%,rgba(42,36,25,.10) 25%,transparent 50%);
     }
     .hero-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
     .hero-header-left{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;min-width:0;flex-direction:column}
@@ -441,16 +442,16 @@
       </div>
       <div class="actions">
         <div class="pill" id="modeBadge">实时监控中</div>
-        <div class="actions-main"><a class="btn primary" style="text-decoration:none;display:inline-flex;align-items:center" href="/push/">推送配置</a></div>
-        <div class="actions-secondary"><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/dev.html">开发者模式</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/settings/">设备设置</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/api/">API 契约</a></div>
+        <div class="actions-main"><a class="btn primary" style="text-decoration:none;display:inline-flex;align-items:center" href="/push/">推送配置</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/review/">样本审核</a></div>
+        <div class="actions-secondary"><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/events/">历史事件</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/dev.html">开发者模式</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/settings/">设备设置</a><a class="btn ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="/api/">API 契约</a></div>
       </div>
     </section>
 
     <section class="grid hero-grid">
-      <div class="card hero" id="heroPanel"><video id="liveVideo" muted autoplay playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.94;display:none;background:#1a1814"></video><img id="livePreview" alt="实时预览" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.92;display:none"><div class="overlay"><div class="hero-header"><div class="hero-header-left"><div class="hero-tag" id="heroScopeTag">全画面监控</div><div class="live"><span class="dot"></span><span id="previewHealthChip">实时预览在线</span></div></div><div class="hero-header-right"><div class="chip" id="cameraSceneChip">饮水机监控</div><button class="mode-option inline-btn" id="fullscreenBtn" onclick="togglePreviewFullscreen()" type="button">全屏</button></div></div><div class="hero-bottom"><div class="hero-bottom-main"><h2>实时饮水区域视图</h2><div class="subtle" id="liveStatusText">稳定连续预览中</div></div><div class="chips"><span class="chip" id="previewModeChip">本地识别在线</span></div></div></div></div>
+      <div class="card hero" id="heroPanel"><video id="liveVideo" muted autoplay playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:1;display:none;background:#1a1814"></video><img id="livePreview" alt="实时预览" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:1;display:none"><div class="overlay"><div class="hero-header"><div class="hero-header-left"><div class="hero-tag" id="heroScopeTag">全画面监控</div><div class="live"><span class="dot"></span><span id="previewHealthChip">实时预览在线</span></div></div><div class="hero-header-right"><div class="chip" id="cameraSceneChip">饮水机监控</div><button class="mode-option inline-btn" id="fullscreenBtn" onclick="togglePreviewFullscreen()" type="button">全屏</button></div></div><div class="hero-bottom"><div class="hero-bottom-main"><h2>实时饮水区域视图</h2><div class="subtle" id="liveStatusText">稳定连续预览中</div></div><div class="chips"><span class="chip" id="previewModeChip">本地识别在线</span></div></div></div></div>
       <div class="stats-two">
-        <div class="card stat-merge"><div class="merge-label">饮水次数</div><div class="merge-row"><span class="merge-today">今日 <strong id="drinkCount">0</strong></span><span class="merge-week">本周 <strong id="weekCount">0</strong></span></div></div>
-        <div class="card stat-merge"><div class="merge-label">预估饮水量</div><div class="merge-row"><span class="merge-today">今日 <strong id="waterMl">0</strong> ml</span><span class="merge-week">本周 <strong id="weekMl">0</strong> ml</span></div></div>
+        <div class="card stat-merge"><div class="merge-label">已确认饮水次数</div><div class="merge-row"><span class="merge-today">今日 <strong id="drinkCount">0</strong></span><span class="merge-week">本周 <strong id="weekCount">0</strong></span></div></div>
+        <div class="card stat-merge"><div class="merge-label">预估饮水量（视频估算）</div><div class="merge-row"><span class="merge-today">今日 <strong id="waterMl">0</strong> ml</span><span class="merge-week">本周 <strong id="weekMl">0</strong> ml</span></div><div class="subtle" id="waterRange" style="margin-top:8px">参考范围等待生成</div></div>
         <div class="card stat-merge"><div class="merge-label">累计时长</div><div class="merge-row"><span class="merge-today">今日 <strong id="durationSec">0</strong> 秒</span><span class="merge-week">本周 <strong id="weekDuration">0</strong> 秒</span></div></div>
         <div class="card stat-merge"><div class="merge-label">平均单次</div><div class="merge-row"><span class="merge-today" style="font-size:20px"><strong id="avgDuration">0</strong> 秒</span></div></div>
       </div>
@@ -484,7 +485,7 @@
             <div class="health-verdict" id="healthVerdict">--</div>
           </div>
         </div></div>
-        <div class="card defer"><div class="inner"><div class="card-title"><h3>饮水趋势</h3><span class="subtle">最近 7 天 · 次数 / 预估饮水量</span></div><div class="chart-shell" id="chartShell"><div class="chart-placeholder">趋势图将在有真实饮水事件后自动生成。</div><canvas id="trendChart" height="240"></canvas></div><div class="note" id="trendNote">趋势数据由饮水事件自动聚合生成，每日更新。</div></div></div>
+        <div class="card defer"><div class="inner"><div class="card-title"><h3>饮水趋势</h3><span class="subtle">最近 7 天 · 已确认次数 / 视频预估饮水量</span></div><div class="chart-shell" id="chartShell"><div class="chart-placeholder">趋势图将在有已确认饮水事件后自动生成。</div><canvas id="trendChart" height="240"></canvas></div><div class="note" id="trendNote">只统计人工或 EasyNVR 高清确认事件；历史未复核记录已隔离。</div></div></div>
         <div class="card defer"><div class="inner"><div class="card-title"><h3>最近饮水事件</h3><span class="subtle" id="calSubtitle">点击日期查看事件</span></div>
   <div class="cal-nav">
     <button class="cal-nav-btn" id="calPrev" title="上一月">&lsaquo;</button>
@@ -499,7 +500,7 @@
       </div>
 
       <div class="grid">
-        <div class="card defer"><div class="inner"><div class="card-title"><h3>运行摘要</h3><span class="subtle">首页只展示关键结果，详细诊断请看开发者模式</span></div><div class="status-list product"><div class="row"><span>实时预览</span><span class="right" id="previewRuntimeState">连接中</span></div><div class="row"><span>检测器状态</span><span class="right" id="analyzerState">启动中</span></div><div class="row"><span>检测器 FPS</span><span class="right" id="detectorFps">--</span></div><div class="row"><span>猫检测 / 置信度</span><span class="right" id="catGateState">--</span></div><div class="row"><span>猫最后出现</span><span class="right" id="detectorCatLastSeen">--</span></div><div class="row"><span>饮水确认</span><span class="right" id="homeDrinkConfirmState">待确认</span></div><div class="row"><span>饮水持续</span><span class="right" id="detectorStreak">0.0s</span></div><div class="row"><span>最近识别更新</span><span class="right" id="detectorUpdatedAt">--</span></div><div class="row"><span>ROI 区域</span><span class="right" id="detectorRoi">--</span></div><div class="row"><span>NAS 负载 / 内存</span><span class="right" id="systemLoad">--</span></div><div class="row"><span>夜间模式</span><span class="right" id="nightModeState">--</span></div></div></div></div>
+        <div class="card defer"><div class="inner"><div class="card-title"><h3>运行摘要</h3><span class="subtle">首页只展示关键结果，详细诊断请看开发者模式</span></div><div class="status-list product"><div class="row"><span>实时预览</span><span class="right" id="previewRuntimeState">连接中</span></div><div class="row"><span>检测器状态</span><span class="right" id="analyzerState">启动中</span></div><div class="row"><span>检测器 FPS</span><span class="right" id="detectorFps">--</span></div><div class="row"><span>猫检测 / 置信度</span><span class="right" id="catGateState">--</span></div><div class="row"><span>猫最后出现</span><span class="right" id="detectorCatLastSeen">--</span></div><div class="row"><span>饮水确认</span><span class="right" id="homeDrinkConfirmState">待确认</span></div><div class="row"><span>饮水持续</span><span class="right" id="detectorStreak">0.0s</span></div><div class="row"><span>最近识别更新</span><span class="right" id="detectorUpdatedAt">--</span></div><div class="row"><span>通知服务</span><span class="right" id="notificationRuntimeState">读取中</span></div><div class="row"><span>每日录像巡检</span><span class="right" id="dailyAuditRuntimeState">读取中</span></div><div class="row"><span>模型持续校准</span><span class="right" id="modelTrainingRuntimeState">读取中</span></div><div class="row"><span>ROI 区域</span><span class="right" id="detectorRoi">--</span></div><div class="row"><span>NAS 负载 / 内存</span><span class="right" id="systemLoad">--</span></div><div class="row"><span>夜间模式</span><span class="right" id="nightModeState">--</span></div></div></div></div>
       </div>
     </section>
   </div>
@@ -553,6 +554,9 @@ function renderOverview(data){
   const overview = {...EMPTY_DASHBOARD.overview, ...(data || {})};
   drinkCount.textContent = Number(overview.drinkCount || 0) > 0 ? overview.drinkCount : '—';
   waterMl.textContent = Number(overview.waterMl || 0) > 0 ? overview.waterMl : '—';
+  setText('waterRange', overview.volumeEstimateMethod === 'active_lapping_v2'
+    ? '今日参考 ' + overview.waterMlLow + '–' + overview.waterMlHigh + ' ml · 未针对本猫标定'
+    : '含旧版事件时长估算，参考范围不可比');
   durationSec.textContent = Number(overview.durationSec || 0) > 0 ? overview.durationSec : '—';
   avgDuration.textContent = Number(overview.avgDuration || 0) > 0 ? overview.avgDuration : '—';
   lastDrink.textContent = overview.lastDrink;
@@ -583,7 +587,8 @@ function updateHealthPanel(detector){
   if (dotCatVisible && dotCatNear && dotDrinking) {
     if (detector) {
       dotCatVisible.className = 'health-dot' + (detector.cat_visible ? ' on' : '');
-      dotCatNear.className = 'health-dot' + (detector.cat_near_fountain ? ' on' : (detector.cat_visible ? ' warn' : ''));
+      var catNear = !!(detector.cat_in_water_zone || detector.cat_at_water_surface || detector.water_occupied || detector.cat_near_fountain);
+      dotCatNear.className = 'health-dot' + (catNear ? ' on' : (detector.cat_visible ? ' warn' : ''));
       dotDrinking.className = 'health-dot' + (detector.drink_active ? ' on' : '');
       var subParts = [];
       if (detector.cat_visible && detector.cat_score) subParts.push('置信度 ' + detector.cat_score.toFixed(2));
@@ -630,8 +635,8 @@ function updateHealthPanel(detector){
       var today = new Date();
       var yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
       var dayBefore = new Date(today); dayBefore.setDate(dayBefore.getDate() - 2);
-      var yStr = String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
-      var dbStr = String(dayBefore.getMonth() + 1).padStart(2, '0') + '-' + String(dayBefore.getDate()).padStart(2, '0');
+      var yStr = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
+      var dbStr = dayBefore.getFullYear() + '-' + String(dayBefore.getMonth() + 1).padStart(2, '0') + '-' + String(dayBefore.getDate()).padStart(2, '0');
       var yIdx = labels.indexOf(yStr);
       var dbIdx = labels.indexOf(dbStr);
       var parts = ['今日 ' + count + ' 次'];
@@ -1062,7 +1067,8 @@ function renderDayEvents(dateStr) {
   var cnt = dayEvents.length;
   if (subtitle) subtitle.textContent = dateStr + ' · ' + cnt + ' 次饮水';
   panel.innerHTML = '<div class="cal-events-header">共 ' + cnt + ' 次饮水事件</div>' + dayEvents.map(function(evt) {
-    return '<div class="event"><div class="thumb"><img src="' + getThumbUrl(evt.img) + '" width="84" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer"></div><div><strong><a href="/events/?id=' + evt.id + '" style="color:#2c2416;text-decoration:none">' + evt.title + '</a></strong><span>' + evt.desc + '</span></div><div class="event-side"><div class="big">' + evt.metric + '</div><div class="subtle">' + evt.tag + '</div></div></div>';
+    var activeText = Number(evt.activeDrinkSec || 0) > 0 ? '有效 ' + Number(evt.activeDrinkSec).toFixed(1) + 's · ' + Number(evt.estimatedMl || 0).toFixed(1) + 'ml' : evt.tag;
+    return '<div class="event"><div class="thumb"><img src="' + getThumbUrl(evt.img) + '" width="84" height="64" loading="lazy" decoding="async" referrerpolicy="no-referrer"></div><div><strong><a href="/events/?id=' + evt.id + '" style="color:#2c2416;text-decoration:none">' + evt.title + '</a></strong><span>' + evt.desc + '</span></div><div class="event-side"><div class="big">' + evt.metric + '</div><div class="subtle">' + activeText + '</div></div></div>';
   }).join('');
 }
 
@@ -1140,7 +1146,7 @@ function renderChart(trends){
   } else {
     const totalCount = (Array.isArray(chartData.counts) ? chartData.counts : []).reduce((a, b) => a + (b || 0), 0);
     const mlSum = (Array.isArray(chartData.ml) ? chartData.ml : []).reduce((a, b) => a + (b || 0), 0);
-    if (noteEl) noteEl.textContent = '已统计 ' + chartData.labels.length + ' 天共 ' + totalCount + ' 次饮水事件，累计预估 ' + mlSum + 'ml 饮水量。';
+    if (noteEl) noteEl.textContent = '已统计 ' + chartData.labels.length + ' 天共 ' + totalCount + ' 次已确认饮水，累计视频估算 ' + mlSum + 'ml。';
   }
   _lastTrends = chartData;
   pendingChartData = {
@@ -1172,7 +1178,33 @@ async function updateRuntimeStatus(settings, push){
   if (settings) {
     analyzerState.textContent = settings.cameraName ? '已配置' : '启动中';
     setText('cameraSceneChip', (settings.cameraName || 'cam-01') + ' · 饮水机监控');
+    const calibration = settings.volumeCalibration || {};
+    const rangeText = document.getElementById('waterRange');
+    if (calibration.appliedAt && rangeText && rangeText.textContent.includes('未针对本猫标定')) {
+      rangeText.textContent = rangeText.textContent.replace('未针对本猫标定', '已按本猫称重校准');
+    }
   }
+  try {
+    const [notification, audit, training] = await Promise.all([
+      fetch('/api/notification-status',{cache:'no-store'}).then(res => res.ok ? res.json() : null),
+      fetch('/api/daily-audit-status',{cache:'no-store'}).then(res => res.ok ? res.json() : null),
+      fetch('/api/model-training-status',{cache:'no-store'}).then(res => res.ok ? res.json() : null)
+    ]);
+    if (notification) {
+      setText('notificationRuntimeState', notification.configured ? (notification.phase || '运行中') : '待配置 Webhook');
+      setLevel(notificationRuntimeState, notification.ok ? (notification.configured ? 'ok' : 'warn') : 'danger');
+    }
+    if (audit) {
+      const auditText = audit.phase === 'scanning' ? ('巡检中 ' + (audit.files_scanned||0) + '/' + (audit.files_total||0)) : (audit.completed_at ? ('最近完成 ' + audit.completed_at.slice(5,16).replace('T',' ')) : '等待凌晨巡检');
+      setText('dailyAuditRuntimeState', auditText);
+      setLevel(dailyAuditRuntimeState, audit.ok ? 'ok' : 'danger');
+    }
+    if (training) {
+      const trainingText = training.phase === 'active' ? ('已启用 · 阈值 ' + training.threshold) : ('待样本 ' + (training.confirmed||0) + '/' + (training.false_positive||0));
+      setText('modelTrainingRuntimeState', trainingText);
+      setLevel(modelTrainingRuntimeState, training.ok ? (training.phase === 'active' ? 'ok' : 'warn') : 'danger');
+    }
+  } catch (_) {}
   try {
     const detector = await fetch('/api/detector-status').then(res => res.ok ? res.json() : null);
     if (detector) {
@@ -1205,7 +1237,8 @@ async function updateRuntimeStatus(settings, push){
           heroSubtle.textContent = '已持续 ' + (detector.streak_sec||0).toFixed(1) + 's · 置信度 ' + (detector.cat_score||0).toFixed(2);
         } else if (detector.cat_visible) {
           heroH2.textContent = '实时饮水区域视图';
-          heroSubtle.textContent = '检测到猫咪 · 置信度 ' + (detector.cat_score||0).toFixed(2) + ' · ' + (detector.cat_near_fountain ? '靠近饮水机' : '在画面中');
+          var catNearText = (detector.cat_in_water_zone || detector.cat_at_water_surface || detector.water_occupied || detector.cat_near_fountain) ? '靠近饮水机' : '在画面中';
+          heroSubtle.textContent = '检测到猫咪 · 置信度 ' + (detector.cat_score||0).toFixed(2) + ' · ' + catNearText;
         } else {
           heroH2.textContent = '实时饮水区域视图';
           heroSubtle.textContent = '摄像头在线 · 检测器运行中 · 等待猫咪出现';
@@ -1225,8 +1258,11 @@ async function updateRuntimeStatus(settings, push){
   try {
     const camera = await fetch('/api/camera-status').then(res => res.ok ? res.json() : null);
     if (camera) {
-      setText('previewRuntimeState', camera.ok ? '预览正常' : '预览异常');
-      setLevel(previewRuntimeState, camera.ok ? 'ok' : 'warn');
+      var showingPlaceholder = livePreview && livePreview.src && livePreview.src.indexOf('data:image/svg+xml') === 0;
+      var previewText = liveStarted ? '实时视频' : (showingPlaceholder ? '占位图' : (camera.snapshot ? '快照预览' : '预览异常'));
+      setText('previewRuntimeState', previewText);
+      setText('previewHealthChip', !camera.ok ? '预览异常' : previewText);
+      setLevel(previewRuntimeState, previewText === '占位图' || !camera.ok ? 'warn' : 'ok');
     }
     var detectorOk = document.getElementById('analyzerState').textContent.indexOf('监控中') >= 0;
     var cameraOk = camera ? camera.ok : false;
