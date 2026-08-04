@@ -41,3 +41,4 @@ Thumbs.db
 docker-compose.override.yml
 .codex-backup-*/
 *.bak-*
+logs/
