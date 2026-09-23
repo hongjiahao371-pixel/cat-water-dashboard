@@ -292,7 +292,26 @@ def _rotate_events(data):
     # Remove archived events from active data
     archived_ids = {e.get('id') for evts in to_archive.values() for e in evts}
     data['events'] = [e for e in events if e.get('id') not in archived_ids]
-    print(f"Archived {len(archived_ids)} events to {EVENT_ARCHIVE_DIR}")
+    # Archive-time media cleanup: snapshots/crops/clips of events past the
+    # retention window are removed so media/events cannot grow unbounded.
+    media_removed = 0
+    events_root = (MEDIA_DIR / 'events').resolve()
+    for e in (e for evts in to_archive.values() for e in evts):
+        refs = [e.get(k) for k in ('img', 'crop', 'clip', 'snapshot_url', 'crop_url')]
+        for k in ('crops', 'clips'):
+            refs.extend(e.get(k) or [])
+        for rel in refs:
+            if not isinstance(rel, str) or not rel.startswith('/media/events/'):
+                continue
+            f = (MEDIA_DIR / rel.lstrip('/')).resolve()
+            try:
+                if f.is_relative_to(events_root) and f.is_file():
+                    f.unlink()
+                    media_removed += 1
+            except OSError:
+                pass
+    print(f"Archived {len(archived_ids)} events to {EVENT_ARCHIVE_DIR}, "
+          f"removed {media_removed} media files")
 
 
 def load_archived_events(start_date='', end_date=''):

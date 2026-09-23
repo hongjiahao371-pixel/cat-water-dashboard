@@ -172,6 +172,7 @@ services:
     - ./models:/app/models:ro
     - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
     - ./server.py:/app/server.py:ro
+    - ./calibrate:/app/calibrate:ro
     - ./auth.js:/app/auth.js:ro
     - ./notification_delivery.py:/app/notification_delivery.py:ro
     - ./events/index.html:/app/events/index.html:ro

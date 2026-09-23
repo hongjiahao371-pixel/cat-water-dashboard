@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>区域标定 · 猫咪饮水监控</title>
+  <script src="/auth.js"></script>
+  <style>
+    :root { --ink:#1a2233; --sub:#5a6475; --line:#e3e6ee; --brand:#0a7d6c; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"PingFang SC","Microsoft YaHei",sans-serif; color:var(--ink); background:#f4f5f8; }
+    header { padding:16px 20px; background:#fff; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+    header h1 { font-size:20px; margin:0; }
+    header a { color:var(--brand); font-size:14px; text-decoration:none; }
+    main { max-width:1100px; margin:18px auto; padding:0 16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+    .modes { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .modes label { padding:8px 14px; border:1px solid var(--line); border-radius:8px; cursor:pointer; font-size:14px; background:#fafbfc; }
+    .modes input { margin-right:6px; }
+    .modes label:has(input:checked) { border-color:var(--brand); color:var(--brand); background:#eef7f5; }
+    canvas { width:100%; border:1px solid var(--line); border-radius:8px; cursor:crosshair; display:block; background:#111; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:10px; margin-top:12px; }
+    .grid label { font-size:12px; color:var(--sub); display:block; }
+    .grid input { width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+    .actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; align-items:center; }
+    button { padding:9px 18px; border:0; border-radius:8px; font-size:14px; cursor:pointer; }
+    .save { background:var(--brand); color:#fff; }
+    .ghost { background:#eef0f4; color:var(--ink); }
+    #status { font-size:14px; color:var(--sub); }
+    .hint { font-size:13px; color:var(--sub); line-height:1.7; margin:8px 0 0; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>区域标定</h1>
+  <span>在实时快照上框出饮水机与水面区域，保存后即时生效</span>
+  <a href="/settings/">← 返回设置</a>
+</header>
+<main>
+  <div class="card">
+    <div class="modes">
+      <label><input type="radio" name="mode" value="water" checked>水面区（检测水面）</label>
+      <label><input type="radio" name="mode" value="fountain">饮水机区（猫活动范围）</label>
+      <label><input type="radio" name="mode" value="line">水面线（点击设高度）</label>
+    </div>
+    <canvas id="cv"></canvas>
+    <p class="hint">拖拽绘制矩形；选“水面线”后在水面位置单击。坐标基于检测帧分辨率
+      <span id="dim">--</span>，与快照分辨率自动换算。区域变化即时生效（检测器每轮热读取）。</p>
+    <div class="grid">
+      <label>水面区 x1<input id="wx1" type="number"></label>
+      <label>y1<input id="wy1" type="number"></label>
+      <label>x2<input id="wx2" type="number"></label>
+      <label>y2<input id="wy2" type="number"></label>
+      <label>饮水机 x1<input id="fx1" type="number"></label>
+      <label>y1<input id="fy1" type="number"></label>
+      <label>x2<input id="fx2" type="number"></label>
+      <label>y2<input id="fy2" type="number"></label>
+      <label>水面线 y<input id="wsy" type="number"></label>
+    </div>
+    <div class="actions">
+      <button class="save" id="save">保存到系统</button>
+      <button class="ghost" id="refresh">刷新快照</button>
+      <button class="ghost" id="clear">清除所选</button>
+      <span id="status"></span>
+    </div>
+  </div>
+</main>
+<script src="/calibrate/app.js"></script>
+</body>
+</html>

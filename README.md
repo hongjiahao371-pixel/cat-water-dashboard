@@ -133,6 +133,7 @@ docker compose run --rm cat-water-locate-verifier \
 | `/events/` | 活动与长期归档事件查询；带 id 时显示快照、检测指标和 EasyNVR 录像回放 |
 | `/api/transcode-status` | 转码连接、重连和存活状态 |
 | `/settings/` | 设备设置、饮水量称重校准与历史 v2 事件重算 |
+| `/calibrate/` | 可视化区域标定 — 在实时快照上拖拽设定水面区/饮水机区/水面线，保存即时热生效 |
 | `/review/` | 边界候选审核与自动高清恢复状态 |
 | `/push/` | Webhook、日报和异常提醒策略及测试发送 |
 | `/api/health` | 实时检测与高清复核链路健康状态 |
