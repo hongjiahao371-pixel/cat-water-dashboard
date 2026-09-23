@@ -173,6 +173,7 @@ def analyze_video(video_path, detector=None, sample_fps=SAMPLE_FPS):
     max_cat = 0.0
     activated = False
     night_mode_seen = False
+    roi_used = False
     try:
         while True:
             ok, frame = capture.read()
@@ -193,9 +194,16 @@ def analyze_video(video_path, detector=None, sample_fps=SAMPLE_FPS):
             cat_box = result.get('cat_box') or []
             max_cat = max(max_cat, float(result.get('cat_score', 0) or 0))
             confidence = 0.0
-            if cat_box and result.get('closeup_water'):
+            roi_evidence = detector_module.roi_drinking_evidence(detector, frame)
+            evidence_box = roi_evidence['box'] if roi_evidence is not None else cat_box
+            near_water = roi_evidence is not None or bool(cat_box and result.get('closeup_water'))
+            if near_water:
                 candidates += 1
-                _, confidence = detector.classify_drinking(frame, cat_box)
+                if roi_evidence is not None:
+                    roi_used = True
+                    confidence = roi_evidence['confidence']
+                else:
+                    _, confidence = detector.classify_drinking(frame, cat_box)
                 confidence = float(confidence or 0)
                 if confidence >= max_classifier:
                     max_classifier = confidence
@@ -203,21 +211,25 @@ def analyze_video(video_path, detector=None, sample_fps=SAMPLE_FPS):
                     peak_cat_box = list(cat_box)
                 threshold = (detector_module.NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD
                              if night_mode else detector_module.CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD)
+                if roi_evidence is not None:
+                    threshold = roi_evidence['threshold']
                 if confidence >= threshold:
                     anchors += 1
                     anchor_times.append(sample_time)
-                    activated = activated or archive_anchor_gate.observe(sample_time, cat_box)
-            gate_active = gates[night_mode].observe(
-                sample_time,
-                bool(result.get('cat_detected')),
-                bool(result.get('closeup_water')),
-                confidence,
-                cat_box,
-            )
-            activated = activated or gate_active
+                    matched = archive_anchor_gate.observe(sample_time, evidence_box)
+                    activated = activated or matched
+            if roi_evidence is None:
+                gate_active = gates[night_mode].observe(
+                    sample_time,
+                    bool(result.get('cat_detected')),
+                    bool(result.get('closeup_water')),
+                    confidence,
+                    cat_box,
+                )
+                activated = activated or gate_active
     finally:
         capture.release()
-    classifier_available = detector._drink_clf_session is not None
+    classifier_available = roi_used or detector._drink_clf_session is not None
     status = classify_verification(
         activated, anchors, max_classifier, classifier_available=classifier_available)
     # Spatial consistency decides whether this is a real event. Once confirmed,
@@ -241,6 +253,7 @@ def analyze_video(video_path, detector=None, sample_fps=SAMPLE_FPS):
         'active_drink_sec': round(active_drink_sec, 3),
         'peak_classifier_sec': round(peak_classifier_sec, 3),
         'peak_cat_box': [round(float(value), 1) for value in peak_cat_box],
+        'drinking_model': 'mouth_water_roi_v1' if roi_used else 'legacy_cat_crop',
         'reason': 'drinking_classifier_unavailable' if not classifier_available else '',
     }
 

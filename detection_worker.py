@@ -6,7 +6,7 @@ Motion pre-filter skips inference when nothing changes, saving ~90% CPU.
 Night mode: auto-detects IR/night footage via saturation analysis, applies CLAHE
 contrast enhancement, and lowers detection thresholds for improved nighttime accuracy.
 """
-import json, os, shutil, subprocess, sys, tempfile, time, urllib.request
+import hashlib, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -168,8 +168,8 @@ REVIEW_SAMPLE_MIN_CONFIDENCE = float(os.environ.get('REVIEW_SAMPLE_MIN_CONFIDENC
 REVIEW_SAMPLE_MAX_CONFIDENCE = float(os.environ.get('REVIEW_SAMPLE_MAX_CONFIDENCE', '1.0'))
 REVIEW_SAMPLE_COOLDOWN_SEC = float(os.environ.get('REVIEW_SAMPLE_COOLDOWN_SEC', '180'))
 REVIEW_SAMPLE_MAX_ITEMS = int(os.environ.get('REVIEW_SAMPLE_MAX_ITEMS', '300'))
-NIGHT_REVIEW_CANDIDATE_CLF_MIN = float(os.environ.get('NIGHT_REVIEW_CANDIDATE_CLF_MIN', '0.5'))
-NIGHT_REVIEW_CANDIDATE_CAT_MIN = float(os.environ.get('NIGHT_REVIEW_CANDIDATE_CAT_MIN', '0.5'))
+NIGHT_REVIEW_CANDIDATE_CLF_MIN = float(os.environ.get('NIGHT_REVIEW_CANDIDATE_CLF_MIN', '0.3'))
+NIGHT_REVIEW_CANDIDATE_CAT_MIN = float(os.environ.get('NIGHT_REVIEW_CANDIDATE_CAT_MIN', '0.4'))
 REVIEW_SAMPLE_DIR = Path(os.environ.get(
     'REVIEW_SAMPLE_DIR', '/app/media/review_candidates'))
 REVIEW_SAMPLE_FILE = Path(os.environ.get(
@@ -846,6 +846,108 @@ class ReviewSampleRecorder:
         return len(self.items)
 
 # ── Cat Detector ─────────────────────────────────────────────────
+def decode_yolo_layout(output):
+    """Recognize supported raw YOLO and end-to-end ONNX detection layouts.
+
+    Raw: (1, 4+classes, candidates), center/size + class scores.
+    End-to-end: (1, candidates, 6), corners + score + class id.
+    Fail explicitly instead of treating an unknown tensor as cat detections.
+    """
+    shape = output.shape
+    if len(shape) != 3 or shape[0] != 1:
+        raise ValueError(f'Unsupported YOLO output shape: {shape}')
+    if shape[2] == 6:
+        return output[0], True
+    if 5 <= shape[1] < 100:
+        return output[0].T, False
+    raise ValueError(f'Unsupported YOLO output shape: {shape}')
+
+
+class RoiDrinkingClassifier:
+    """Camera-specific mouth/water classifier, independent of whole-cat boxes.
+
+    The optional configuration and checksum make activation explicit. Missing or
+    invalid models fall back to the existing detector without changing its data.
+    """
+
+    def __init__(self, config_path):
+        self.session = None
+        self.threshold = 0.9
+        self.roi = None
+        self.model_id = ''
+        self.error = ''
+        path = Path(config_path)
+        if not path.is_file():
+            return
+        try:
+            config = json.loads(path.read_text())
+            if not config.get('enabled', False):
+                return
+            roi = config['roi']
+            threshold = float(config['threshold'])
+            if (len(roi) != 4 or not all(np.isfinite(roi)) or
+                    not (0 <= roi[0] < roi[2] <= 1 and 0 <= roi[1] < roi[3] <= 1)):
+                raise ValueError('invalid normalized ROI')
+            if not 0.5 <= threshold <= 0.995:
+                raise ValueError('invalid ROI threshold')
+            model = (path.parent / config['model']).resolve()
+            checksum = hashlib.sha256(model.read_bytes()).hexdigest()
+            if checksum != config['sha256']:
+                raise ValueError('ROI model checksum mismatch')
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = 2
+            options.inter_op_num_threads = 1
+            session = ort.InferenceSession(str(model), sess_options=options,
+                                           providers=['CPUExecutionProvider'])
+            if session.get_inputs()[0].shape != [1, 3, 224, 224]:
+                raise ValueError('unsupported ROI model input')
+            self.roi = roi
+            self.threshold = threshold
+            self.model_id = checksum[:12]
+            self.session = session
+            print(f'ROI drinking classifier loaded: {self.model_id}, threshold={threshold}')
+        except Exception as exc:
+            self.error = str(exc)
+            print(f'ROI classifier unavailable; using legacy: {self.error}')
+
+    def evidence(self, frame):
+        if self.session is None:
+            return None
+        h, w = frame.shape[:2]
+        # Corpus includes this camera's 16:9 archive and 4:3 live output.
+        if not h or min(abs(w / h - ratio) for ratio in (16 / 9, 4 / 3)) > 0.04:
+            return None
+        a, b, c, d = self.roi
+        box = [round(w * a), round(h * b), round(w * c), round(h * d)]
+        x1, y1, x2, y2 = box
+        crop = frame[y1:y2, x1:x2]
+        if not crop.size:
+            return None
+        try:
+            rgb = cv2.cvtColor(cv2.resize(crop, (224, 224)), cv2.COLOR_BGR2RGB)
+            tensor = rgb.astype(np.float32) / 255.0
+            tensor = (tensor - np.array([.485, .456, .406], np.float32)) / np.array(
+                [.229, .224, .225], np.float32)
+            tensor = tensor.transpose(2, 0, 1)[None]
+            output = self.session.run(None, {self.session.get_inputs()[0].name: tensor})[0]
+            logit = float(np.asarray(output).reshape(-1)[0])
+            if not np.isfinite(logit):
+                raise ValueError('non-finite ROI output')
+            confidence = float(1 / (1 + np.exp(-np.clip(logit, -30, 30))))
+            return {'confidence': confidence, 'threshold': self.threshold,
+                    'box': box, 'model_id': self.model_id}
+        except Exception as exc:
+            self.error = str(exc)
+            self.session = None
+            print(f'ROI classifier failed; using legacy: {self.error}')
+            return None
+
+
+def roi_drinking_evidence(detector, frame):
+    classifier = getattr(detector, '_roi_classifier', None)
+    return classifier.evidence(frame) if classifier is not None else None
+
+
 class CatDetector:
     def __init__(self):
         self.session = None
@@ -867,6 +969,8 @@ class CatDetector:
         # Drinking classifier (optional - loaded when model file exists)
         self._drink_clf_session = None
         self._load_drinking_classifier()
+        self._roi_classifier = RoiDrinkingClassifier(os.environ.get(
+            'ROI_DRINKING_CONFIG', '/app/models/roi_drinking.json'))
         self._load_model()
 
     def _load_model(self):
@@ -977,33 +1081,44 @@ class CatDetector:
         inp = letterbox.astype(np.float32) / 255.0
         inp = np.transpose(inp, (2, 0, 1))[np.newaxis, :, :, :]
         output = self.session.run(None, {'images': inp})[0]
-        predictions = output[0].T
-        num_channels = len(predictions[0]) if len(predictions) > 0 else 0
-        is_coco = 5 < num_channels < 100
+        predictions, end_to_end = decode_yolo_layout(output)
+        # Filter scores in NumPy before Python iteration (raw heads have 8400 rows).
+        if end_to_end or predictions.shape[1] == 5:
+            score_column = 4
+        elif predictions.shape[1] > 4 + COCO_CAT_LABEL:
+            score_column = 4 + COCO_CAT_LABEL
+        else:
+            return []
+        keep = np.isfinite(predictions).all(axis=1) & (predictions[:, score_column] >= threshold)
+        if end_to_end:
+            keep &= predictions[:, 5] == COCO_CAT_LABEL
         items = []
-        for pred in predictions:
-            if len(pred) < 5:
-                continue
-            x, y, bw, bh = float(pred[0]), float(pred[1]), float(pred[2]), float(pred[3])
-            if is_coco:
-                if len(pred) <= 4 + COCO_CAT_LABEL:
+        for pred in predictions[keep]:
+            if end_to_end:
+                # YOLO26 one-to-one: x1,y1,x2,y2,score,class_id in input pixels.
+                if float(pred[5]) != COCO_CAT_LABEL:
                     continue
-                conf = float(pred[4 + COCO_CAT_LABEL])
-                # Person rejection: if person class score dominates cat score,
-                # this detection is more likely a person than a cat.
-                if PERSON_REJECTION_ENABLED and len(pred) > 4 + COCO_PERSON_LABEL:
-                    person_conf = float(pred[4 + COCO_PERSON_LABEL])
-                    if person_conf > PERSON_SCORE_REJECT_THRESHOLD and person_conf > conf:
-                        continue
-            else:
                 conf = float(pred[4])
-            if conf < threshold:
+                left, top, right, bottom = map(float, pred[:4])
+            else:
+                x, y, bw, bh = map(float, pred[:4])
+                if len(pred) == 5:  # legacy single-class cat model
+                    conf = float(pred[4])
+                else:
+                    if len(pred) <= 4 + COCO_CAT_LABEL:
+                        continue
+                    conf = float(pred[4 + COCO_CAT_LABEL])
+                    if PERSON_REJECTION_ENABLED:
+                        person_conf = float(pred[4 + COCO_PERSON_LABEL])
+                        if person_conf > PERSON_SCORE_REJECT_THRESHOLD and person_conf > conf:
+                            continue
+                left, top, right, bottom = x - bw/2, y - bh/2, x + bw/2, y + bh/2
+            if conf < threshold or right <= left or bottom <= top:
                 continue
-            # Map letterbox coords back to original
-            x1 = (x - pad_x - bw/2) / scale + offset_x
-            y1 = (y - pad_y - bh/2) / scale + offset_y
-            x2 = (x - pad_x + bw/2) / scale + offset_x
-            y2 = (y - pad_y + bh/2) / scale + offset_y
+            x1 = (left - pad_x) / scale + offset_x
+            y1 = (top - pad_y) / scale + offset_y
+            x2 = (right - pad_x) / scale + offset_x
+            y2 = (bottom - pad_y) / scale + offset_y
             items.append({'score': conf, 'box': [int(x1), int(y1), int(x2), int(y2)]})
         return items
 
@@ -1226,6 +1341,7 @@ def main():
     temporal_night_gate = TemporalClassifierGate(
         threshold=NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD,
     )
+    temporal_roi_gate = TemporalClassifierGate(threshold=detector._roi_classifier.threshold)
     candidate_gate = DrinkingCandidateGate()
     active_drink_evidence = ActiveDrinkEvidence()
     review_recorder = ReviewSampleRecorder()
@@ -1255,6 +1371,10 @@ def main():
         best_candidate_at = float('-inf')
         candidate_gate.reset()
         active_drink_evidence.reset()
+        temporal_roi_gate.hits.clear()
+        temporal_roi_gate.hold_until = float('-inf')
+        temporal_roi_gate.last_box = None
+        temporal_roi_gate.last_confidence = 0.0
 
     def finalize_active_event(reason, end_ts=None, include_postbuffer=True):
         nonlocal last_drink_end_at
@@ -1278,7 +1398,7 @@ def main():
                 'start_time': start_time,
                 'end_time': end_time,
                 'duration_sec': round(total_duration, 1),
-                'confidence': event_peak_clf_conf if detector._drink_clf_session is not None else peak_cat_score,
+                'confidence': event_peak_clf_conf if (detector._drink_clf_session is not None or event_trigger_source.startswith('classifier_temporal_roi')) else peak_cat_score,
                 'cat_confidence': round(peak_cat_score, 3),
                 'drinking_confidence': round(event_peak_clf_conf, 3),
                 'active_drink_sec': active_drink_sec,
@@ -1410,9 +1530,12 @@ def main():
 
             # ── Drinking detection: classifier-first, geometric fallback ──
             cat_candidate = bool(cat_box and len(cat_box) == 4 and wzone)
+            # Score the current frame even when motion/whole-cat detection misses
+            # a close-up head. The ROI is evidence geometry, never a cat box.
+            roi_evidence = roi_drinking_evidence(detector, frame)
             temporal_gate = temporal_night_gate if night_mode else temporal_day_gate
             temporal_classifier_active = False
-            if cat_candidate:
+            if cat_candidate and roi_evidence is None:
                 if detector._drink_clf_session is not None:
                     is_drinking_clf, drink_clf_conf = detector.classify_drinking(
                         frame, cat_box, threshold=classifier_threshold)
@@ -1466,13 +1589,27 @@ def main():
                         if cat_at_water:
                             geometric_drinking = True
                             trigger_source = 'geometric_overlap'
-            temporal_classifier_active = temporal_gate.observe(
-                now, cat_candidate, bool(closeup_water), drink_clf_conf, cat_box)
+            evidence_box = cat_box
+            evidence_candidate = cat_candidate
+            evidence_near_water = bool(closeup_water)
             active_anchor_threshold = (NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD
                                        if night_mode else CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD)
+            if roi_evidence is not None:
+                drink_clf_conf = roi_evidence['confidence']
+                classifier_threshold = active_anchor_threshold = roi_evidence['threshold']
+                evidence_box = roi_evidence['box']
+                evidence_candidate = evidence_near_water = True
+                temporal_gate = temporal_roi_gate
+                if drink_clf_conf >= classifier_threshold and drink_clf_conf > best_candidate_conf:
+                    best_candidate_frame = frame.copy()
+                    best_candidate_crop = None
+                    best_candidate_conf = drink_clf_conf
+                    best_candidate_at = now
+            temporal_classifier_active = temporal_gate.observe(
+                now, evidence_candidate, evidence_near_water, drink_clf_conf, evidence_box)
             direct_lapping_anchor = bool(
-                cat_candidate and closeup_water and drink_clf_conf >= active_anchor_threshold)
-            active_drink_evidence.observe(now, direct_lapping_anchor, cat_box)
+                evidence_candidate and evidence_near_water and drink_clf_conf >= active_anchor_threshold)
+            active_drink_evidence.observe(now, direct_lapping_anchor, evidence_box)
             if not event_active and not temporal_classifier_active:
                 active_drink_evidence.prune(
                     now - max(3.0, CLASSIFIER_TEMPORAL_WINDOW_SEC + 1.0))
@@ -1481,7 +1618,8 @@ def main():
                 classifier_drinking = True
                 temporal_confidence = max(
                     float(drink_clf_conf), float(temporal_gate.last_confidence))
-                trigger_source = f'classifier_temporal({temporal_confidence:.2f})'
+                source = 'classifier_temporal_roi' if roi_evidence is not None else 'classifier_temporal'
+                trigger_source = f'{source}({temporal_confidence:.2f})'
             cat_score = result.get("cat_score", 0)
             cat_near_water = False
             water_occupied_supported = False
@@ -1505,6 +1643,8 @@ def main():
                 (water_occupied and cat_visible and cat_near_water and water_occupied_supported and cat_score >= 0.35) or
                 False
             )
+            if roi_evidence is not None:
+                drinking = temporal_classifier_active
             if drinking and not trigger_source:
                 if water_occupied and cat_visible and cat_near_water and water_occupied_supported:
                     trigger_source = 'water_occupied+cat'
@@ -1575,6 +1715,8 @@ def main():
                     event_profile = 'night' if night_mode else 'day'
                     evidence_recorder.start(current_event_id, {
                         'model': get_active_model_path(),
+                        'drinking_model': ('mouth_water_roi_v1' if roi_evidence is not None else 'legacy_cat_crop'),
+                        'roi_model_id': roi_evidence['model_id'] if roi_evidence is not None else '',
                         'trigger_source': event_trigger_source,
                         'profile': event_profile,
                         'cat_score': round(float(peak_cat_score), 3),
@@ -1609,7 +1751,7 @@ def main():
                             'event_id': current_event_id,
                             'type': 'drink_start',
                             'start_time': start_time,
-                            'confidence': event_peak_clf_conf if detector._drink_clf_session is not None else peak_cat_score,
+                            'confidence': event_peak_clf_conf if (detector._drink_clf_session is not None or event_trigger_source.startswith('classifier_temporal_roi')) else peak_cat_score,
                             'cat_confidence': round(peak_cat_score, 3),
                             'drinking_confidence': round(event_peak_clf_conf, 3),
                             'snapshot_url': f'/media/events/snap-{current_event_id}.jpg',
@@ -1638,7 +1780,7 @@ def main():
                 duration = (now - cat_in_zone_since) if cat_in_zone_since and drinking else 0
                 nflag = "NIGHT" if night_mode else "DAY"
                 trig = trigger_source if trigger_source else '-'
-                clf_str = f"clf={drink_clf_conf:.2f}" if detector._drink_clf_session else 'clf=off'
+                clf_str = f"clf={drink_clf_conf:.2f}" if (detector._drink_clf_session or roi_evidence is not None) else 'clf=off'
                 print(f"FPS:{fps:.1f} cat_vis={cat_visible} wsurf={cat_at_water} "
                       f"water={water_occupied} closeup={closeup_water} drinking={event_active} dur={duration:.1f}s "
                       f"score={result.get('cat_score',0):.2f} {clf_str} trig={trig} [{nflag}]")
@@ -1664,7 +1806,10 @@ def main():
                     'streak_sec': round(streak, 1),
                     'last_drink_at': last_drink_end_at,
                     'detection_mode': 'simplified_v3',
-                    'drinking_classifier': detector._drink_clf_session is not None,
+                    'drinking_model': ('mouth_water_roi_v1' if roi_evidence is not None else 'legacy_cat_crop'),
+                    'roi_model_id': detector._roi_classifier.model_id,
+                    'roi_classifier_error': detector._roi_classifier.error,
+                    'drinking_classifier': detector._drink_clf_session is not None or roi_evidence is not None,
                     'clf_confidence': round(drink_clf_conf, 3),
                     'clf_threshold': round(classifier_threshold, 3),
                     'geometric_clf_floor': round(geometric_clf_floor, 3),

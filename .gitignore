@@ -42,3 +42,11 @@ docker-compose.override.yml
 .codex-backup-*/
 *.bak-*
 logs/
+
+# Accuracy campaign artifacts (large evidence archives stay NAS-only)
+accuracy-20260908/
+upgrade-20260908/*.tar.gz
+upgrade-20260908/benchmark-results/
+recent-clips.tar
+*.tar
+*.onnx

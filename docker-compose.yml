@@ -299,6 +299,63 @@ services:
     - ./models:/app/models:ro
     - ./detection_worker.py:/app/detection_worker.py:ro
     - ./archive_verifier_worker.py:/app/archive_verifier_worker.py:ro
+  cat-water-locate-verifier:
+    command:
+    - python3
+    - -u
+    - locate_verifier_worker.py
+    container_name: cat-water-locate-verifier
+    depends_on:
+    - cat-water-dashboard
+    build:
+      context: .
+      dockerfile: Dockerfile.locate
+    image: cat-water-locate-verifier:20260821
+    cpus: '3.0'
+    mem_limit: 8g
+    environment:
+    - TZ=Asia/Shanghai
+    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
+    - LOCATE_MODEL_PATH=/models/locate-anything-q6_k.gguf
+    - LOCATE_MODEL_ID=locate-anything-q6_k:818ba69f0dd8
+    - LOCATE_STRATEGY_ID=mouth-contact-all-frames-v2
+    - LOCATE_MODE=slow
+    - LOCATE_THREADS=3
+    - LOCATE_IMAGE_MAX_EDGE=672
+    - LOCATE_MAX_FRAMES=3
+    - LOCATE_MIN_HITS=2
+    - LOCATE_MIN_HIT_RATIO=0.50
+    - LOCATE_MIN_COHERENT_IOU=0.08
+    - LOCATE_MIN_COHERENT_PAIRS=2
+    - LOCATE_MIN_COMPLETE_FRAMES=3
+    - LOCATE_MIN_LOCALIZED_HITS=2
+    - LOCATE_MAX_LOCALIZED_BOX_AREA_RATIO=0.12
+    - LOCATE_REQUIRE_ALL_FRAMES=true
+    - LOCATE_MAX_LOAD=3.5
+    - LOCATE_MAX_PER_POLL=1
+    - LOCATE_POLL_SEC=60
+    - LOCATE_MIN_INTERVAL_SEC=1800
+    - LOCATE_LOOKBACK_DAYS=30
+    - LOCATE_RESULTS_MAX_ITEMS=500
+    - LOCATE_EVIDENCE_MAX_EVENTS=200
+    - LOCATE_SHADOW_MODE=true
+    healthcheck:
+      test:
+      - CMD
+      - python3
+      - -c
+      - import json,time; s=json.load(open('/app/data/locate_verifier_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<1200 else 1)
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 900s
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./models/locate-anything-q6_k.gguf:/models/locate-anything-q6_k.gguf:ro
+    - ./locate_verifier_worker.py:/app/locate_verifier_worker.py:ro
   cat-water-detector:
     command:
     - python3

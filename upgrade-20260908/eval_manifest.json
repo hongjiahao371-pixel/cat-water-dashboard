@@ -1,0 +1,851 @@
+{
+  "clips": [
+    {
+      "id": "recovered-audit-20260806-075224-0dab68a03c",
+      "label": "confirmed",
+      "profile": "night",
+      "clip": "media/events/event-20260806-075332.mp4",
+      "bytes": 1921263,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "recovered-audit-20260805-162808-56445ac9f0",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260805-162925.mp4",
+      "bytes": 3642501,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260802-110434-750183",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260802-110541.mp4",
+      "bytes": 2584330,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260802-091917-668942",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260802-092027.mp4",
+      "bytes": 2043077,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "recovered-audit-20260731-105453-6c2d8182f2",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260731-105610.mp4",
+      "bytes": 2295191,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260729-032714-565933",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260729-032836.mp4",
+      "bytes": 3729664,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "recovered-audit-20260728-202606-48407e59bd",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260728-202717.mp4",
+      "bytes": 2724196,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260724-144128-316478",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260724-144241.mp4",
+      "bytes": 2980601,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260723-110815-715527",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260723-110933.mp4",
+      "bytes": 1684793,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "recovered-audit-20260722-111002-a403f9ec0e",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260722-111106.mp4",
+      "bytes": 3403408,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260719-012358-320976",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260719-012515.mp4",
+      "bytes": 2028152,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260716-093458-600523",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260716-093636.mp4",
+      "bytes": 2204733,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "auto-recovered-review-20260715-211738-021913",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "media/events/event-20260715-211842.mp4",
+      "bytes": 2433433,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "event-20260712-084921",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260712-084921.mp4",
+      "bytes": 2136795,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    },
+    {
+      "id": "event-20260712-021902",
+      "label": "confirmed",
+      "profile": "day",
+      "clip": "media/events/event-20260712-021902.mp4",
+      "bytes": 2728423,
+      "visual_review": "contains_drinking",
+      "label_scope_warning": "Original event label is not a reliable label for its associated clip; reviewed separately. Clips contain overlays and are only a smoke-test cohort."
+    }
+  ],
+  "snapshots": [
+    {
+      "id": "auto-recovered-review-20260809-114523-426547",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260809-114523-426547.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260809-083245-574815",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260809-083245-574815.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260809-002424-897022",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260809-002424-897022.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260809-001054-601550",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260809-001054-601550.jpg"
+    },
+    {
+      "id": "recovered-audit-20260808-183212-9b6eb67746",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260808-183212-9b6eb67746.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260808-111951-697019",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260808-111951-697019.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260808-014720-376436",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260808-014720-376436.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260807-234456-186585",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260807-234456-186585.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260807-210738-373667",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260807-210738-373667.jpg"
+    },
+    {
+      "id": "recovered-audit-20260807-152159-f24559d96e",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260807-152159-f24559d96e.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260807-011609-462361",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260807-011609-462361.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260806-225223-243271",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260806-225223-243271.jpg"
+    },
+    {
+      "id": "recovered-audit-20260806-094531-ecfb4a5548",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260806-094531-ecfb4a5548.jpg"
+    },
+    {
+      "id": "recovered-audit-20260806-075224-0dab68a03c",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260806-075224-0dab68a03c.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260805-233016-249981",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260805-233016-249981.jpg"
+    },
+    {
+      "id": "recovered-audit-20260805-162808-56445ac9f0",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260805-162808-56445ac9f0.jpg"
+    },
+    {
+      "id": "recovered-audit-20260805-162628-80131326f8",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260805-162628-80131326f8.jpg"
+    },
+    {
+      "id": "recovered-audit-20260805-090339-2a7782906f",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260805-090339-2a7782906f.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260805-085904-520035",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260805-085904-520035.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-233625-551b243983",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260804-233625-551b243983.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-211419-ad31a4dac4",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260804-211419-ad31a4dac4.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-210629-0521c31a3f",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260804-210629-0521c31a3f.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260804-210555-718399",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260804-210555-718399.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-210443-00b9a78155",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260804-210443-00b9a78155.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260804-162909-325821",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260804-162909-325821.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-162830-521d74528d",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260804-162830-521d74528d.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260804-110605-777606",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260804-110605-777606.jpg"
+    },
+    {
+      "id": "recovered-audit-20260804-110604-745dd3013f",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260804-110604-745dd3013f.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260804-025902-960073",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260804-025902-960073.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260803-230123-619937",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260803-230123-619937.jpg"
+    },
+    {
+      "id": "recovered-audit-20260803-022735-a6e54b3ae5",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260803-022735-a6e54b3ae5.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260803-003539-410978",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260803-003539-410978.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-232649-ea25fb98d6",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-232649-ea25fb98d6.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260802-224932-173426",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260802-224932-173426.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-224752-f85e984bff",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-224752-f85e984bff.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-194256-eb8999edae",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-194256-eb8999edae.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260802-181751-657297",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260802-181751-657297.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260802-110434-750183",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260802-110434-750183.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260802-091917-668942",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260802-091917-668942.jpg"
+    },
+    {
+      "id": "auto-recovered-review-20260802-085829-063696",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/review_candidates/review-20260802-085829-063696.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-080400-cd9636a134",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-080400-cd9636a134.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-022646-14f7cd1068",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-022646-14f7cd1068.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-022510-dfa4fa916b",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-022510-dfa4fa916b.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-012956-739b985835",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-012956-739b985835.jpg"
+    },
+    {
+      "id": "recovered-audit-20260802-002600-04d6bbc7d5",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260802-002600-04d6bbc7d5.jpg"
+    },
+    {
+      "id": "recovered-audit-20260801-174750-afcf75418c",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260801-174750-afcf75418c.jpg"
+    },
+    {
+      "id": "recovered-audit-20260731-223300-4edc31c256",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260731-223300-4edc31c256.jpg"
+    },
+    {
+      "id": "recovered-audit-20260731-105453-6c2d8182f2",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260731-105453-6c2d8182f2.jpg"
+    },
+    {
+      "id": "recovered-audit-20260731-083255-637d667afb",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260731-083255-637d667afb.jpg"
+    },
+    {
+      "id": "recovered-audit-20260731-081322-8173ff2ca1",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260731-081322-8173ff2ca1.jpg"
+    },
+    {
+      "id": "recovered-audit-20260730-211935-ee3f4fc158",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260730-211935-ee3f4fc158.jpg"
+    },
+    {
+      "id": "recovered-audit-20260730-182916-f7d98c0fbe",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260730-182916-f7d98c0fbe.jpg"
+    },
+    {
+      "id": "recovered-audit-20260730-182820-eaa06a4c30",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260730-182820-eaa06a4c30.jpg"
+    },
+    {
+      "id": "recovered-audit-20260729-141659-972fd31865",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260729-141659-972fd31865.jpg"
+    },
+    {
+      "id": "recovered-audit-20260729-141539-24ff522597",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260729-141539-24ff522597.jpg"
+    },
+    {
+      "id": "recovered-audit-20260729-085551-8ebb75fef5",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260729-085551-8ebb75fef5.jpg"
+    },
+    {
+      "id": "recovered-audit-20260729-012332-4573739546",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260729-012332-4573739546.jpg"
+    },
+    {
+      "id": "recovered-audit-20260728-202606-48407e59bd",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260728-202606-48407e59bd.jpg"
+    },
+    {
+      "id": "recovered-audit-20260728-081820-50a48d40cc",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260728-081820-50a48d40cc.jpg"
+    },
+    {
+      "id": "recovered-audit-20260727-054056-22a8daa11a",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260727-054056-22a8daa11a.jpg"
+    },
+    {
+      "id": "recovered-audit-20260726-180624-000481e7c0",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260726-180624-000481e7c0.jpg"
+    },
+    {
+      "id": "recovered-audit-20260726-142146-b814a18427",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260726-142146-b814a18427.jpg"
+    },
+    {
+      "id": "recovered-audit-20260725-165739-170d6211f9",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260725-165739-170d6211f9.jpg"
+    },
+    {
+      "id": "recovered-audit-20260725-110828-9862fd1502",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260725-110828-9862fd1502.jpg"
+    },
+    {
+      "id": "recovered-audit-20260725-081128-a43caa68ad",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260725-081128-a43caa68ad.jpg"
+    },
+    {
+      "id": "recovered-audit-20260725-072237-2751e2e075",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260725-072237-2751e2e075.jpg"
+    },
+    {
+      "id": "recovered-audit-20260725-021857-e3a6118aa8",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260725-021857-e3a6118aa8.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-225242-828260b286",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-225242-828260b286.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-143128-99b3e43e97",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-143128-99b3e43e97.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-085450-047926f420",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-085450-047926f420.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-085110-6d32bdcf85",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-085110-6d32bdcf85.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-084431-1d41a08eb0",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-084431-1d41a08eb0.jpg"
+    },
+    {
+      "id": "recovered-audit-20260724-012110-103c42ec9f",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260724-012110-103c42ec9f.jpg"
+    },
+    {
+      "id": "recovered-audit-20260723-083330-e6e2736f52",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260723-083330-e6e2736f52.jpg"
+    },
+    {
+      "id": "recovered-audit-20260722-193123-b793059f00",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260722-193123-b793059f00.jpg"
+    },
+    {
+      "id": "recovered-audit-20260722-111002-a403f9ec0e",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260722-111002-a403f9ec0e.jpg"
+    },
+    {
+      "id": "recovered-audit-20260722-002249-ce86901ea2",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260722-002249-ce86901ea2.jpg"
+    },
+    {
+      "id": "recovered-audit-20260721-145220-778042516d",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260721-145220-778042516d.jpg"
+    },
+    {
+      "id": "recovered-audit-20260721-080325-a22db25ed2",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260721-080325-a22db25ed2.jpg"
+    },
+    {
+      "id": "recovered-audit-20260721-021133-c75ec8d33e",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260721-021133-c75ec8d33e.jpg"
+    },
+    {
+      "id": "recovered-audit-20260721-011410-8242a72faf",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260721-011410-8242a72faf.jpg"
+    },
+    {
+      "id": "recovered-audit-20260720-134858-530e69dd50",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260720-134858-530e69dd50.jpg"
+    },
+    {
+      "id": "recovered-audit-20260720-041853-94bc02a816",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260720-041853-94bc02a816.jpg"
+    },
+    {
+      "id": "recovered-audit-20260720-015715-fccb343ffc",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260720-015715-fccb343ffc.jpg"
+    },
+    {
+      "id": "recovered-audit-20260719-222544-5fc938fff7",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260719-222544-5fc938fff7.jpg"
+    },
+    {
+      "id": "recovered-audit-20260719-184056-90a3f425a1",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260719-184056-90a3f425a1.jpg"
+    },
+    {
+      "id": "recovered-audit-20260718-111326-7b57ef2956",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260718-111326-7b57ef2956.jpg"
+    },
+    {
+      "id": "recovered-audit-20260717-092947-a2cacad6e3",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260717-092947-a2cacad6e3.jpg"
+    },
+    {
+      "id": "recovered-audit-20260716-185349-53575d0436",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260716-185349-53575d0436.jpg"
+    },
+    {
+      "id": "recovered-audit-20260716-025940-e02981a604",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260716-025940-e02981a604.jpg"
+    },
+    {
+      "id": "recovered-audit-20260714-142538-6040ca5dc0",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260714-142538-6040ca5dc0.jpg"
+    },
+    {
+      "id": "recovered-audit-20260714-080454-3bff2b22be",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260714-080454-3bff2b22be.jpg"
+    },
+    {
+      "id": "recovered-audit-20260714-051915-64a9f6d1f5",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260714-051915-64a9f6d1f5.jpg"
+    },
+    {
+      "id": "recovered-audit-20260714-051721-4f238bd0ee",
+      "label": "confirmed",
+      "profile": "night",
+      "image": "media/audit_candidates/audit-20260714-051721-4f238bd0ee.jpg"
+    },
+    {
+      "id": "recovered-audit-20260714-014103-dedc8f4dce",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260714-014103-dedc8f4dce.jpg"
+    },
+    {
+      "id": "recovered-audit-20260713-091325-3b488b334e",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260713-091325-3b488b334e.jpg"
+    },
+    {
+      "id": "recovered-audit-20260713-042516-460fcf3c04",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260713-042516-460fcf3c04.jpg"
+    },
+    {
+      "id": "recovered-audit-20260713-015934-ac98c0164a",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260713-015934-ac98c0164a.jpg"
+    },
+    {
+      "id": "recovered-audit-20260712-090224-e3a558cb9e",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260712-090224-e3a558cb9e.jpg"
+    },
+    {
+      "id": "event-20260712-084921",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/events/snap-event-20260712-084921.jpg"
+    },
+    {
+      "id": "recovered-audit-20260712-072427-17440a3cc3",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260712-072427-17440a3cc3.jpg"
+    },
+    {
+      "id": "recovered-audit-20260712-022404-acf8ab5096",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260712-022404-acf8ab5096.jpg"
+    },
+    {
+      "id": "event-20260712-021902",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/events/snap-event-20260712-021902.jpg"
+    },
+    {
+      "id": "recovered-audit-20260712-012552-9c86bfea13",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260712-012552-9c86bfea13.jpg"
+    },
+    {
+      "id": "recovered-audit-20260712-012406-8241768b8f",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/audit_candidates/audit-20260712-012406-8241768b8f.jpg"
+    },
+    {
+      "id": "event-20260710-131407",
+      "label": "false_positive",
+      "profile": "day",
+      "image": "media/events/snap-event-20260710-131407.jpg"
+    },
+    {
+      "id": "event-20260708-222553",
+      "label": "confirmed",
+      "profile": "day",
+      "image": "media/events/snap-event-20260708-222553.jpg"
+    }
+  ],
+  "segments": [
+    {
+      "id": "negative-03",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-03.mp4",
+      "source_clip": "media/events/event-20260802-092027.mp4",
+      "start_sec": 0,
+      "end_sec": 4.5,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    },
+    {
+      "id": "negative-04",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-04.mp4",
+      "source_clip": "media/events/event-20260731-105610.mp4",
+      "start_sec": 0,
+      "end_sec": 4,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    },
+    {
+      "id": "negative-07",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-07.mp4",
+      "source_clip": "media/events/event-20260724-144241.mp4",
+      "start_sec": 0,
+      "end_sec": 6,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    },
+    {
+      "id": "negative-09",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-09.mp4",
+      "source_clip": "media/events/event-20260722-111106.mp4",
+      "start_sec": 0,
+      "end_sec": 6,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    },
+    {
+      "id": "negative-11",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-11.mp4",
+      "source_clip": "media/events/event-20260716-093636.mp4",
+      "start_sec": 0,
+      "end_sec": 4,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    },
+    {
+      "id": "negative-13",
+      "label": "false_positive",
+      "profile": "day",
+      "clip": "eval-segments/negative-13.mp4",
+      "source_clip": "media/events/event-20260712-084921.mp4",
+      "start_sec": 0,
+      "end_sec": 4,
+      "truth_source": "assistant_visual_review_20260908",
+      "review_method": "Contact sheets sampled every 0.4 sec show no mouth-water contact during the selected interval."
+    }
+  ]
+}

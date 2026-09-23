@@ -27,6 +27,7 @@ class RuntimeSafetyTests(unittest.TestCase):
         cls.detector_worker = load_module('detection_worker')
         cls.server = load_module('server')
         cls.archive_verifier = load_module('archive_verifier_worker')
+        cls.locate_verifier = load_module('locate_verifier_worker')
         cls.notification_delivery = load_module('notification_delivery')
         cls.notification_worker = load_module('notification_worker')
         cls.daily_audit = load_module('daily_audit_worker')
@@ -281,8 +282,21 @@ class RuntimeSafetyTests(unittest.TestCase):
             self.assertEqual((delivered, error), (1, ''))
             self.assertEqual(state['queue'], [])
             self.assertIn('test:1', state['sent'])
+            self.assertNotIn('last_error', state)
+            self.assertEqual(worker.status_error(state), '')
         finally:
             worker.deliver = previous
+
+    def test_notification_status_hides_error_resolved_by_later_success(self):
+        worker = self.notification_worker
+        state = {
+            'last_error': 'frequency limited',
+            'last_error_at': '2026-07-12T21:00:00+08:00',
+            'last_success_at': '2026-07-12T21:01:00+08:00',
+        }
+        self.assertEqual(worker.status_error(state), '')
+        state['last_success_at'] = '2026-07-12T20:59:00+08:00'
+        self.assertEqual(worker.status_error(state), 'frequency limited')
 
     def test_notification_queue_stops_after_max_retries(self):
         worker = self.notification_worker
@@ -510,6 +524,183 @@ class RuntimeSafetyTests(unittest.TestCase):
         self.assertEqual(classify(False, 0, 0.10), 'rejected')
         self.assertEqual(classify(False, 1, 0.91), 'uncertain')
         self.assertEqual(classify(False, 0, 0.0, classifier_available=False), 'error')
+
+    def test_locate_sanitization_rejects_degenerate_far_and_duplicate_boxes(self):
+        worker = self.locate_verifier
+        detections = [
+            {'label': 'drinking cat', 'box': [260, 120, 620, 500]},
+            {'label': 'duplicate', 'box': [262, 122, 618, 498]},
+            {'label': 'degenerate', 'box': [10, 10, 10, 50]},
+            {'label': 'too large', 'box': [0, 0, 1000, 600]},
+            {'label': 'far away', 'box': [0, 0, 100, 100]},
+        ]
+        result = worker.sanitize_detections(
+            detections, 1000, 600, [400, 300, 700, 520])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['label'], 'drinking cat')
+
+    def test_locate_multiframe_vote_requires_spatial_coherence(self):
+        worker = self.locate_verifier
+        coherent = worker.classify_frame_results([
+            {'detections': [{'box': [100, 100, 400, 400]}]},
+            {'detections': [{'box': [110, 105, 410, 405]}]},
+            {'detections': [{'box': [115, 110, 415, 410]}]},
+        ])
+        self.assertEqual(coherent['verdict'], 'supports_drinking')
+        weak = worker.classify_frame_results([
+            {'detections': [{'box': [100, 100, 400, 400]}]},
+            {'detections': [{'box': [110, 105, 410, 405]}]},
+            {'detections': []},
+        ])
+        self.assertEqual(weak['legacy_verdict'], 'supports_drinking')
+        self.assertEqual(weak['verdict'], 'inconclusive')
+        localized = worker.classify_frame_results([
+            {'detections': [{
+                'box': [300, 190, 500, 290], 'area_ratio': 0.035,
+            }]},
+            {'detections': [{
+                'box': [290, 200, 470, 295], 'area_ratio': 0.031,
+            }]},
+            {'detections': []},
+        ])
+        self.assertEqual(localized['localized_frames'], 2)
+        self.assertEqual(localized['localized_coherent_pairs'], 1)
+        self.assertEqual(localized['verdict'], 'supports_drinking')
+        unrelated = worker.classify_frame_results([
+            {'detections': [{'box': [0, 0, 100, 100]}]},
+            {'detections': [{'box': [500, 300, 600, 400]}]},
+            {'detections': []},
+        ])
+        self.assertEqual(unrelated['verdict'], 'inconclusive')
+        absent = worker.classify_frame_results([
+            {'detections': []}, {'detections': []}, {'detections': []},
+        ])
+        self.assertEqual(absent['verdict'], 'no_support')
+
+    def test_locate_sampling_centers_on_archive_classifier_peak(self):
+        worker = self.locate_verifier
+        times = worker.select_sample_times(90, {
+            'archiveVerification': {'peak_classifier_sec': 42.0},
+        }, count=3)
+        self.assertEqual(times, [40.5, 42.0, 43.5])
+        evenly_spaced = worker.select_sample_times(100, {}, count=3)
+        self.assertEqual(evenly_spaced, [20.0, 50.0, 80.0])
+        anchor_range = worker.select_sample_times(100, {
+            'archiveVerification': {'first_anchor_sec': 10.0, 'last_anchor_sec': 50.0},
+        }, count=3)
+        self.assertEqual(anchor_range, [11.0, 30.0, 49.0])
+        audit_range = worker.select_sample_times(40, {
+            'auditRecovery': True, 'activeDrinkSec': 15.0,
+            'archiveVerification': {'peak_classifier_sec': 5.0},
+        }, count=3)
+        self.assertEqual(audit_range, [16.0, 22.5, 29.0])
+        self.assertTrue(worker.uses_direct_archive_timeline({'auditRecovery': True}))
+        self.assertFalse(worker.uses_direct_archive_timeline({'recoveryCandidate': True}))
+
+    def test_locate_shadow_metrics_keep_inconclusive_out_of_precision(self):
+        metrics = self.locate_verifier.benchmark_metrics([
+            {'truth': 'confirmed', 'verdict': 'supports_drinking'},
+            {'truth': 'confirmed', 'verdict': 'no_support'},
+            {'truth': 'rejected', 'verdict': 'supports_drinking'},
+            {'truth': 'rejected', 'verdict': 'no_support'},
+            {'truth': 'confirmed', 'verdict': 'inconclusive'},
+        ])
+        self.assertEqual(
+            {key: metrics[key] for key in ('tp', 'fp', 'tn', 'fn', 'inconclusive')},
+            {'tp': 1, 'fp': 1, 'tn': 1, 'fn': 2, 'inconclusive': 1},
+        )
+        self.assertEqual(metrics['precision'], 0.5)
+        self.assertEqual(metrics['recall'], 0.3333)
+        self.assertEqual(metrics['accuracy'], 0.4)
+        self.assertEqual(metrics['decision_coverage'], 0.8)
+        self.assertEqual(metrics['decisive']['recall'], 0.5)
+
+    def test_locate_truth_uses_nested_archive_status_and_prioritizes_human_labels(self):
+        worker = self.locate_verifier
+        now = worker.datetime.now(worker.CST)
+        events = [
+            {
+                'id': 'new-uncertain',
+                'start_time': now.isoformat(timespec='seconds'),
+                'archiveVerification': {'status': 'uncertain'},
+            },
+            {
+                'id': 'older-human-rejected',
+                'start_time': (now - worker.timedelta(hours=1)).isoformat(timespec='seconds'),
+                'label': 'false_positive',
+            },
+            {
+                'id': 'older-archive-confirmed',
+                'start_time': (now - worker.timedelta(hours=2)).isoformat(timespec='seconds'),
+                'archiveVerification': {'status': 'confirmed'},
+            },
+        ]
+        self.assertEqual(worker.truth_label(events[0]), 'uncertain')
+        self.assertEqual(worker.truth_label(events[2]), 'confirmed')
+        self.assertEqual(worker.truth_source(events[1]), 'human')
+        self.assertEqual(worker.truth_source(events[2]), 'automatic')
+        selected = worker.eligible_events(events, {'events': {}}, limit=3)
+        self.assertEqual(
+            [event['id'] for event in selected],
+            ['older-human-rejected', 'older-archive-confirmed', 'new-uncertain'],
+        )
+        legacy_state = {'events': {
+            'older-human-rejected': {
+                'model': worker.MODEL_ID,
+                'completed_at': worker.now_iso(),
+            },
+        }}
+        self.assertIn(
+            'older-human-rejected',
+            [event['id'] for event in worker.eligible_events(
+                events, legacy_state, limit=3)],
+        )
+        current_state = {'events': {
+            'older-human-rejected': {
+                'model': worker.MODEL_ID,
+                'strategy_id': worker.STRATEGY_ID,
+                'completed_at': worker.now_iso(),
+            },
+        }}
+        self.assertNotIn(
+            'older-human-rejected',
+            [event['id'] for event in worker.eligible_events(
+                events, current_state, limit=3)],
+        )
+
+    def test_locate_metrics_split_truth_source_and_profile(self):
+        metrics = self.locate_verifier.benchmark_metrics([
+            {
+                'truth': 'confirmed', 'verdict': 'supports_drinking',
+                'truth_source': 'human', 'profile': 'day',
+            },
+            {
+                'truth': 'rejected', 'verdict': 'inconclusive',
+                'truth_source': 'human', 'profile': 'night',
+            },
+            {
+                'truth': 'confirmed', 'verdict': 'no_support',
+                'truth_source': 'automatic', 'profile': 'night',
+            },
+        ])
+        self.assertEqual(metrics['by_truth_source']['human']['evaluated'], 2)
+        self.assertEqual(metrics['by_truth_source']['automatic']['fn'], 1)
+        self.assertEqual(metrics['by_profile']['night']['evaluated'], 2)
+        self.assertEqual(metrics['by_profile']['night']['inconclusive'], 1)
+
+    def test_locate_cooldown_defers_background_inference(self):
+        worker = self.locate_verifier
+        statuses = []
+        previous = worker.write_status
+        worker.write_status = lambda **payload: statuses.append(payload)
+        try:
+            processed = worker.run_once(
+                None, {'events': {}, 'last_run_unix': worker.time.time()})
+        finally:
+            worker.write_status = previous
+        self.assertEqual(processed, 0)
+        self.assertEqual(statuses[0]['reason'], 'cooldown')
+        self.assertGreater(statuses[0]['retry_after_sec'], 0)
 
     def test_archive_anchor_gate_accepts_sparse_spatially_coherent_hits(self):
         gate = self.archive_verifier.ArchiveAnchorGate(window_sec=8, min_iou=0.2)
@@ -877,7 +1068,7 @@ class RuntimeSafetyTests(unittest.TestCase):
             server.write_json(server.DATA_FILE, {'events': [], 'overview': {}})
             server.write_json(server.REVIEW_CANDIDATES_FILE, {'items': []})
             server.write_json(server.DAILY_AUDIT_CANDIDATES_FILE, {'items': [{
-                'id': 'sample', 'created_at': '2026-07-12T19:11:32+08:00',
+                'id': 'sample', 'created_at': server.datetime.now(server.CST).isoformat(timespec='seconds'),
                 'snapshot_url': '/media/audit_candidates/sample.jpg',
                 'crop_url': '/media/audit_candidates/sample-crop.jpg',
                 'classifier_confidence': 0.998, 'cat_confidence': 0.7,

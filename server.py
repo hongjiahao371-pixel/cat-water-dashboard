@@ -30,6 +30,7 @@ DETECTOR_STATUS_FILE = DATA_DIR / 'detector_status.json'
 TRANSCODE_STATUS_FILE = DATA_DIR / 'transcode_status.json'
 BACKFILL_STATUS_FILE = DATA_DIR / 'backfill_status.json'
 ARCHIVE_VERIFIER_STATUS_FILE = DATA_DIR / 'archive_verifier_status.json'
+LOCATE_VERIFIER_STATUS_FILE = DATA_DIR / 'locate_verifier_status.json'
 NOTIFICATION_STATUS_FILE = DATA_DIR / 'notification_status.json'
 LABEL_STATS_FILE = DATA_DIR / 'label_stats.json'
 TRAINING_MANIFEST_FILE = DATA_DIR / 'training_manifest.json'
@@ -245,6 +246,7 @@ DETECTOR_STATUS_STALE_SEC = int(os.environ.get('DETECTOR_STATUS_STALE_SEC', '30'
 TRANSCODE_STATUS_STALE_SEC = int(os.environ.get('TRANSCODE_STATUS_STALE_SEC', '30'))
 BACKFILL_STATUS_STALE_SEC = int(os.environ.get('BACKFILL_STATUS_STALE_SEC', '900'))
 ARCHIVE_VERIFIER_STATUS_STALE_SEC = int(os.environ.get('ARCHIVE_VERIFIER_STATUS_STALE_SEC', '600'))
+LOCATE_VERIFIER_STATUS_STALE_SEC = int(os.environ.get('LOCATE_VERIFIER_STATUS_STALE_SEC', '1200'))
 NOTIFICATION_STATUS_STALE_SEC = int(os.environ.get('NOTIFICATION_STATUS_STALE_SEC', '180'))
 DAILY_AUDIT_STATUS_STALE_SEC = int(os.environ.get('DAILY_AUDIT_STATUS_STALE_SEC', '900'))
 MODEL_TRAINING_STATUS_STALE_SEC = int(os.environ.get('MODEL_TRAINING_STATUS_STALE_SEC', '28800'))
@@ -798,6 +800,13 @@ def load_archive_verifier_status():
     }), ARCHIVE_VERIFIER_STATUS_STALE_SEC, 'archive verifier status is stale')
 
 
+def load_locate_verifier_status():
+    return _status_with_freshness(read_json(LOCATE_VERIFIER_STATUS_FILE, {
+        'ok': False, 'phase': 'LocateAnything verifier not started', 'updated_at': '',
+        'shadow_mode': True,
+    }), LOCATE_VERIFIER_STATUS_STALE_SEC, 'LocateAnything verifier status is stale')
+
+
 def load_notification_status():
     return _status_with_freshness(read_json(NOTIFICATION_STATUS_FILE, {
         'ok': False, 'phase': 'notification worker not started', 'updated_at': '',
@@ -877,6 +886,7 @@ def load_system_metrics():
     transcode = load_transcode_status()
     backfill = load_backfill_status()
     archive_verifier = load_archive_verifier_status()
+    locate_verifier = load_locate_verifier_status()
     return {
         'ok': True,
         'host': {
@@ -909,6 +919,7 @@ def load_system_metrics():
             'transcode': {'ok': transcode.get('ok', False), 'phase': transcode.get('phase', ''), 'age_sec': transcode.get('age_sec')},
             'backfill': {'ok': backfill.get('ok', False), 'phase': backfill.get('phase', ''), 'age_sec': backfill.get('age_sec')},
             'archive_verifier': {'ok': archive_verifier.get('ok', False), 'phase': archive_verifier.get('phase', ''), 'age_sec': archive_verifier.get('age_sec')},
+            'locate_verifier': {'ok': locate_verifier.get('ok', False), 'phase': locate_verifier.get('phase', ''), 'age_sec': locate_verifier.get('age_sec')},
         },
     }
 
@@ -1169,6 +1180,86 @@ def event_clip_window(evt, archive_verification=False):
         end_offset = 20 if evt.get('recoveryCandidate') else 60
         return start_dt - timedelta(seconds=150), end_dt - timedelta(seconds=end_offset)
     return start_dt - timedelta(seconds=15), end_dt + timedelta(seconds=10)
+
+
+VOLUME_LEDGER_FILE = DATA_DIR / 'volume_credit_ledger.json'
+VOLUME_LEDGER_KEEP_DAYS = 14
+
+
+def _merge_intervals(intervals):
+    merged = []
+    for start, end in sorted((float(s), float(e)) for s, e in intervals):
+        if end <= start:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged
+
+
+def _free_seconds(intervals, span_start, span_end):
+    """Seconds of [span_start, span_end] not covered by the merged intervals."""
+    free = 0.0
+    cursor = span_start
+    for start, end in _merge_intervals(intervals):
+        if end <= cursor:
+            continue
+        if start > span_end:
+            break
+        free += max(0.0, min(start, span_end) - cursor)
+        cursor = max(cursor, end)
+    free += max(0.0, span_end - cursor)
+    return free
+
+
+def load_volume_ledger():
+    try:
+        payload = json.loads(VOLUME_LEDGER_FILE.read_text(encoding='utf-8'))
+        if isinstance(payload, dict) and isinstance(payload.get('days'), dict):
+            return payload
+    except (OSError, ValueError):
+        pass
+    return {'version': 1, 'days': {}}
+
+
+def credit_anchor_duration(event, detail, requested_sec):
+    """Book an event's archive anchor seconds once per shared timeline span.
+
+    Neighbouring events re-analyze the same licking from their own clips, so
+    raw anchor cluster durations double-book shared wall-clock seconds (one
+    visit split into two events booked ~3x its real duration). Anchors are
+    clip-relative; mapping them through the archive clip origin (start_time
+    - 150s) puts neighbouring events on the same formula timeline, which is
+    all dedup needs — the recording lag shifts neighbours equally. The full
+    anchor span is recorded so later overlapping events cannot re-book it.
+    Caller must hold FILE_LOCK. Fails open to the requested seconds.
+    """
+    requested_sec = float(requested_sec or 0)
+    if requested_sec <= 0:
+        return requested_sec
+    start_dt = parse_event_dt(event.get('start_time', ''))
+    if not start_dt:
+        return requested_sec
+    first = float(detail.get('first_anchor_sec', 0) or 0)
+    last = float(detail.get('last_anchor_sec', 0) or 0)
+    if last <= first:
+        return requested_sec
+    clip_origin = (start_dt - timedelta(seconds=150)).timestamp()
+    span_start, span_end = clip_origin + first, clip_origin + last
+    ledger = load_volume_ledger()
+    days = ledger.setdefault('days', {})
+    day_key = start_dt.strftime('%Y%m%d')
+    day_intervals = [tuple(iv) for iv in days.get(day_key, [])]
+    free = _free_seconds(day_intervals, span_start, span_end)
+    credit = min(requested_sec, free)
+    days[day_key] = _merge_intervals(day_intervals + [[span_start, span_end]])
+    cutoff = start_dt - timedelta(days=VOLUME_LEDGER_KEEP_DAYS)
+    for key in [k for k in list(days) if k < cutoff.strftime('%Y%m%d')]:
+        del days[key]
+    write_json(VOLUME_LEDGER_FILE, ledger, skip_lock=True)
+    return credit
+
 
 def refresh_event_display(evt):
     start = fmt_time(evt.get('start_time', ''))
@@ -1707,6 +1798,10 @@ def update_event_verification(event_id, payload):
         )
         if status == 'confirmed' and should_refresh_volume:
             active_duration = archive_active_duration
+            try:
+                active_duration = credit_anchor_duration(event, detail, active_duration)
+            except Exception as exc:
+                print(f'volume credit dedup failed for {event_id}: {exc}', flush=True)
             if event.get('recoveryCandidate') and active_duration <= 0:
                 active_duration = detail.get('anchor_span_sec', 0.0) + 0.5
             active_duration = max(0.0, min(120.0, active_duration))
@@ -2232,6 +2327,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._send_json(load_daily_audit_status())
         if path == '/api/model-training-status':
             return self._send_json(load_model_training_status())
+        if path == '/api/locate-verifier-status':
+            return self._send_json(load_locate_verifier_status())
         if path == '/api/camera-status':
             return self._send_json(load_camera_status())
         if path == '/api/detector-status':
@@ -2423,11 +2520,14 @@ class Handler(SimpleHTTPRequestHandler):
             detector = load_detector_status()
             transcode = load_transcode_status()
             archive_verifier = load_archive_verifier_status()
+            locate_verifier = load_locate_verifier_status()
             notifications = load_notification_status()
             daily_audit = load_daily_audit_status()
             model_training = load_model_training_status()
             pipeline_ok = bool(camera.get('ok') and detector.get('ok') and transcode.get('ok') and archive_verifier.get('ok'))
-            overall_ok = bool(pipeline_ok and notifications.get('ok') and daily_audit.get('ok') and model_training.get('ok'))
+            overall_ok = bool(
+                pipeline_ok and locate_verifier.get('ok') and notifications.get('ok')
+                and daily_audit.get('ok') and model_training.get('ok'))
             return self._send_json({
                 'ok': overall_ok,
                 'service': 'cat-water-dashboard-api',
@@ -2438,6 +2538,7 @@ class Handler(SimpleHTTPRequestHandler):
                     'detector': {'ok': detector.get('ok', False), 'phase': detector.get('phase', ''), 'age_sec': detector.get('age_sec')},
                     'transcode': {'ok': transcode.get('ok', False), 'phase': transcode.get('phase', ''), 'age_sec': transcode.get('age_sec')},
                     'archive_verifier': {'ok': archive_verifier.get('ok', False), 'phase': archive_verifier.get('phase', ''), 'age_sec': archive_verifier.get('age_sec')},
+                    'locate_verifier': {'ok': locate_verifier.get('ok', False), 'phase': locate_verifier.get('phase', ''), 'shadow_mode': locate_verifier.get('shadow_mode', True), 'metrics': locate_verifier.get('metrics', {}), 'age_sec': locate_verifier.get('age_sec')},
                     'notifications': {'ok': notifications.get('ok', False), 'phase': notifications.get('phase', ''), 'configured': notifications.get('configured', False), 'age_sec': notifications.get('age_sec')},
                     'daily_audit': {'ok': daily_audit.get('ok', False), 'phase': daily_audit.get('phase', ''), 'date': daily_audit.get('date', ''), 'age_sec': daily_audit.get('age_sec')},
                     'model_training': {'ok': model_training.get('ok', False), 'phase': model_training.get('phase', ''), 'ready': model_training.get('ready', False), 'age_sec': model_training.get('age_sec')},

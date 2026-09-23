@@ -1,0 +1,37 @@
+FROM debian:bookworm-slim AS locate-builder
+
+ARG LOCATE_ANYTHING_COMMIT=77376ab332de918220f7a7e391542eefb5407c9f
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates cmake g++ git make \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git init locate-anything.cpp \
+    && cd locate-anything.cpp \
+    && git remote add origin https://github.com/mudler/locate-anything.cpp.git \
+    && git fetch --depth 1 origin ${LOCATE_ANYTHING_COMMIT} \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "${LOCATE_ANYTHING_COMMIT}" \
+    && git submodule update --init --recursive --depth 1
+
+RUN cmake -S /src/locate-anything.cpp -B /src/locate-anything.cpp/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLA_BUILD_TESTS=OFF \
+        -DLA_BUILD_CLI=ON \
+        -DLA_SHARED=ON \
+    && cmake --build /src/locate-anything.cpp/build --parallel
+
+FROM ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
+
+LABEL org.opencontainers.image.source="https://github.com/mudler/locate-anything.cpp" \
+      org.opencontainers.image.revision="77376ab332de918220f7a7e391542eefb5407c9f" \
+      org.opencontainers.image.licenses="MIT; model weights use NVIDIA non-commercial terms"
+
+COPY --from=locate-builder /src/locate-anything.cpp/build/liblocate_anything.so /usr/local/lib/liblocate_anything.so
+COPY --from=locate-builder /src/locate-anything.cpp/build/examples/cli/locate-anything-cli /usr/local/bin/locate-anything-cli
+
+RUN ldconfig \
+    && locate-anything-cli --help >/dev/null
+
+CMD ["python3", "-u", "locate_verifier_worker.py"]

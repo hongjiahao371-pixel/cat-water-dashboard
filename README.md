@@ -10,6 +10,8 @@
                                      实时事件 / 不确定候选
                                                         ↓
                        EasyNVR 高清录像复核 → 已确认统计 / 排除 / 人工审核
+                                      ↓
+             LocateAnything 关键帧语义复核（影子模式，不改统计）
 ```
 
 ### 服务
@@ -21,6 +23,7 @@
 | cat-water-camera | - | RTSP 定时抓帧 |
 | cat-water-qsv-transcode | 39100 | RTSP → FLV 转码 (CPU编码, 960px/8fps) |
 | cat-water-archive-verifier | - | EasyNVR 高清录像二次复核和漏检候选恢复 |
+| cat-water-locate-verifier | - | LocateAnything-3B Q6_K 对猫嘴接触水面的高清关键帧做严格三帧语义复核和 A/B 评估；默认影子模式 |
 | cat-water-notifier | - | 日报、未饮水和低饮水提醒，带去重与失败重试 |
 | cat-water-daily-audit | - | 凌晨先做关键帧预筛，再用低频强证据门和 2 FPS 精校扫描前一日高清录像，发现实时阶段完全遗漏的候选 |
 | cat-water-model-trainer | - | 持续检查人工样本，达到门槛后交叉验证并安全发布本猫分类阈值校准 |
@@ -34,6 +37,7 @@
 - **饮水判定**: 分类器达到日/夜阈值且位于饮水区候选范围；需要连续帧确认。无分类器时才使用严格几何判定。
 - **证据保留**: 确认事件会写入快照、叠加标注短片和帧级元数据；旧事件可从 EasyNVR 录像动态提取。
 - **高清复核**: 实时事件结束后从 EasyNVR 高清录像取证，只有同一空间目标的重复高置信锚点才确认。
+- **语义复核**: 对已有高清复核结论的事件，从分类器峰值附近提取 3 张关键帧，裁剪到饮水机区域后交给 LocateAnything；模型框还必须接近标定水区并跨帧保持空间一致。结果保存到独立状态与证据目录，默认不改写正式事件和统计。
 - **漏检恢复**: 未形成事件的边界候选会自动进入高清探测；确认前不计入统计，也不会自动写成训练标签。
 - **每日巡检**: 每天 03:30 对前一日 EasyNVR 高清录像做低频预筛和 2 FPS 严格复核；新发现只进入审核队列，人工确认后才计入统计。
 - **统计口径**: 只统计人工确认或高清确认事件；历史未复核记录保留但从趋势和汇总隔离。
@@ -50,9 +54,10 @@
 要求: Docker；Intel GPU `/dev/dri` 为可选加速，驱动不可用时自动使用 CPU
 
 ```bash
-# 1. 准备 YOLOv8n ONNX 模型
+# 1. 准备模型
 mkdir -p models
 # 下载 yolov8n ONNX 模型放入 models/
+# 将 locate-anything-q6_k.gguf 放入 models/；必须遵守 NVIDIA 模型许可
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -60,6 +65,10 @@ cp .env.example .env
 
 # 3. 启动
 docker compose up -d
+
+# 可选：指定事件做一次影子复核
+docker compose run --rm cat-water-locate-verifier \
+  python3 -u locate_verifier_worker.py --once --event-id EVENT_ID
 ```
 
 ## 环境变量 (检测器)
@@ -85,6 +94,16 @@ docker compose up -d
 | `CAT_WATER_API_TOKEN` | 空 | 写接口鉴权令牌；生产环境必须设置 |
 | `MODEL_TRAINING_MIN_POSITIVE` | 50 | 自动分类阈值校准所需最少确认样本 |
 | `MODEL_TRAINING_MIN_NEGATIVE` | 20 | 自动分类阈值校准所需最少误报样本 |
+| `LOCATE_SHADOW_MODE` | true | 只保存 LocateAnything 结论，不改写正式事件 |
+| `LOCATE_MODE` | slow | CPU 解码模式；当前方案优先稳健性 |
+| `LOCATE_MAX_FRAMES` | 3 | 每个候选事件最多复核的高清关键帧数 |
+| `LOCATE_MIN_COHERENT_PAIRS` | 2 | 强确认所需的最少跨帧空间一致对 |
+| `LOCATE_MIN_COMPLETE_FRAMES` | 3 | 强确认所需的完整取证帧数 |
+| `LOCATE_MIN_LOCALIZED_HITS` | 2 | 口鼻小框强证据所需的最少命中帧数 |
+| `LOCATE_MAX_LOCALIZED_BOX_AREA_RATIO` | 0.12 | 口鼻定位框允许占整帧的最大比例；整猫大框不走该快速确认分支 |
+| `LOCATE_REQUIRE_ALL_FRAMES` | true | 只有全部关键帧均命中才允许输出强确认 |
+| `LOCATE_MAX_LOAD` | 3.5 | 1 分钟负载超过此值时推迟语义复核 |
+| `LOCATE_MIN_INTERVAL_SEC` | 1800 | 两次后台复核之间的最短冷却时间，避免持续占满 CPU |
 
 详见 `detection_worker.py` 顶部完整配置列表。
 
@@ -111,6 +130,7 @@ docker compose up -d
 | `/api/notification-status` | 通知配置、重试队列和最近发送状态 |
 | `/api/daily-audit-status` | 每日录像巡检进度和结果摘要 |
 | `/api/model-training-status` | 本猫分类阈值持续校准状态、样本门槛和交叉验证结果 |
+| `/api/locate-verifier-status` | LocateAnything 模型、策略版本、影子模式、处理阶段，以及按人工/自动真值和昼夜拆分的全样本 A/B 指标 |
 | `/api/events?include_archived=1` | 跨活动数据与日期归档查询历史事件 |
 | `/api/events/archive-status` | 长期归档文件、数量和日期范围 |
 | `/api/volume-calibrations` | 最近 50 次饮水量校准记录 |
@@ -118,7 +138,25 @@ docker compose up -d
 
 ## 技术栈
 
-- Python 3.9+, OpenCV, ONNX Runtime
+- Python 3.9+, OpenCV, ONNX Runtime, LocateAnything-3B Q6_K/ggml
 - YOLOv8n COCO (80类, 640×640)
 - Python `ThreadingHTTPServer` + HTML/CSS/JS
 - Docker Compose 部署
+
+
+## 2026-09-08 YOLO26 compatibility and evaluation
+
+YOLO26n and YOLO26s (640, ONNX opset17) are installed as candidates. YOLOv8n remains active: replay did not demonstrate a consistent overall drinking-accuracy improvement. The detector accepts raw and end-to-end ONNX outputs. See `upgrade-20260908/YOLO26升级实测报告.md` and `upgrade-20260908/benchmark-results/summary.json`. Restore point: `.codex-backup-20260908-yolo26/baseline.tar.gz`.
+
+
+## 2026-09-21 ROI drinking classifier activation
+
+The camera-specific ROI mouth/water classifier (roi_drinking_20260908.onnx) is now active in
+production at threshold 0.80 (models/roi_drinking.json; previously disabled pending validation).
+Evidence: sealed full-day A/B replay of 2026-09-06 (identical recordings, 1.16M decoded frames)
+21 episodes / 606.2 active seconds vs legacy 19 / 75.7s; reference episode 58.0s against a
+human-frozen 55.808s truth (legacy captured 1.0s); independent visual verification of the
+ROI-only episodes and a noon negative control. Close-up frames where whole-cat YOLO boxes fail
+are the main source of legacy misses; the archive verifier consumes the same ROI evidence.
+Fallback to the legacy path remains automatic when the config is disabled or the model fails.
+See accuracy-20260908/full-day/PROGRESS.md and accuracy-20260908/recovery-20260918/.

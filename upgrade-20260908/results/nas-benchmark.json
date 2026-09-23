@@ -1,0 +1,62 @@
+[
+  {
+    "model": "v8n",
+    "frame_size": [
+      960,
+      720
+    ],
+    "samples": 12,
+    "detector_plus_classifier_median_ms": 454.02,
+    "p95_ms": 491.01,
+    "cat_score": 0.0,
+    "classifier": 0.0,
+    "output_shape": [
+      1,
+      84,
+      8400
+    ],
+    "providers": [
+      "CPUExecutionProvider"
+    ]
+  },
+  {
+    "model": "26n",
+    "frame_size": [
+      960,
+      720
+    ],
+    "samples": 12,
+    "detector_plus_classifier_median_ms": 314.27,
+    "p95_ms": 350.54,
+    "cat_score": 0.0,
+    "classifier": 0.0,
+    "output_shape": [
+      1,
+      84,
+      8400
+    ],
+    "providers": [
+      "CPUExecutionProvider"
+    ]
+  },
+  {
+    "model": "26s",
+    "frame_size": [
+      960,
+      720
+    ],
+    "samples": 12,
+    "detector_plus_classifier_median_ms": 966.75,
+    "p95_ms": 1014.74,
+    "cat_score": 0.373,
+    "classifier": 0.005299136973917484,
+    "output_shape": [
+      1,
+      84,
+      8400
+    ],
+    "providers": [
+      "CPUExecutionProvider"
+    ]
+  }
+]

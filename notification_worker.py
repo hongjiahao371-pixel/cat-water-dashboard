@@ -253,7 +253,23 @@ def process_queue(state, push, now):
     if len(failed) > 500:
         state['failed'] = dict(sorted(
             failed.items(), key=lambda item: item[1].get('failed_at', ''))[-500:])
+    if delivered and not last_error:
+        state.pop('last_error', None)
+        state.pop('last_error_at', None)
     return delivered, last_error
+
+
+def status_error(state, error=''):
+    if error:
+        return error
+    stored = str(state.get('last_error') or '')
+    if not stored:
+        return ''
+    success_at = parse_datetime(state.get('last_success_at'))
+    error_at = parse_datetime(state.get('last_error_at'))
+    if success_at and error_at and success_at >= error_at:
+        return ''
+    return stored
 
 
 def write_status(state, phase, configured, error=''):
@@ -265,7 +281,8 @@ def write_status(state, phase, configured, error=''):
         'failed': len(state.get('failed', {})),
         'last_success_at': state.get('last_success_at', ''),
         'last_success_type': state.get('last_success_type', ''),
-        'last_error': error or state.get('last_error', ''),
+        'last_error': status_error(state, error),
+        'last_error_at': state.get('last_error_at', ''),
         'updated_at': now_iso(),
         'updated_unix': time.time(),
     })

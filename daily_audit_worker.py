@@ -161,6 +161,15 @@ def prefilter_batch(paths, detector, settings):
                 diff = cv2.absdiff(gray, cv2.convertScaleAbs(background))
                 motion_score = float(diff[mask > 0].mean()) if detector_module.np.any(mask) else 0.0
             force_check = source_frame_index == 0
+            roi_evidence = detector_module.roi_drinking_evidence(detector, frame)
+            if roi_evidence is not None:
+                inference_samples += 1
+                confidence = roi_evidence['confidence']
+                max_classifier = max(max_classifier, confidence)
+                if confidence >= PREFILTER_MIN_CLASSIFIER:
+                    interesting.add(source_index)
+                cv2.accumulateWeighted(gray, background, 0.04)
+                continue
             if not force_check and motion_score < PREFILTER_MOTION_THRESHOLD:
                 cv2.accumulateWeighted(gray, background, 0.04)
                 continue

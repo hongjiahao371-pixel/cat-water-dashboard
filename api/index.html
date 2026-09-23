@@ -98,6 +98,7 @@
   "pipeline_ok": true,
   "services": {
     "archive_verifier": {"ok": true, "phase": "idle"},
+    "locate_verifier": {"ok": true, "phase": "idle", "shadow_mode": true},
     "notifications": {"ok": true, "phase": "idle", "configured": true},
     "daily_audit": {"ok": true, "phase": "scanning"}
   }
@@ -129,4 +130,10 @@ Authorization: Bearer &lt;CAT_WATER_API_TOKEN&gt;</pre><h3>GET /api/events?inclu
   "confirmed": 14,
   "false_positive": 2,
   "ready": false
+}</pre><h3>GET /api/locate-verifier-status</h3><pre>{
+  "ok": true,
+  "phase": "idle",
+  "shadow_mode": true,
+  "model": "locate-anything-q6_k:818ba69f0dd8",
+  "metrics": {"evaluated": 0, "precision": null, "recall": null}
 }</pre></div></div></div></body></html>

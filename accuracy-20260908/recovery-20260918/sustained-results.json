@@ -1,0 +1,106 @@
+[
+  {
+    "id": "event-20260907-015305",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 2.0
+  },
+  {
+    "id": "event-20260907-143208",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 3.4
+  },
+  {
+    "id": "event-20260907-164945",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 2.0
+  },
+  {
+    "id": "event-20260907-214550",
+    "label": 1,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260908-002807",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 11.4
+  },
+  {
+    "id": "event-20260908-002918",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 6.2
+  },
+  {
+    "id": "event-20260908-162859",
+    "label": 1,
+    "roi080_trigger": true,
+    "sustained_trigger": true,
+    "combined_trigger": true,
+    "first_sustained": 9.0
+  },
+  {
+    "id": "event-20260907-015305-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260907-143208-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260907-214550-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260908-002807-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260908-002918-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  },
+  {
+    "id": "event-20260908-162859-negative",
+    "label": 0,
+    "roi080_trigger": false,
+    "sustained_trigger": false,
+    "combined_trigger": false,
+    "first_sustained": null
+  }
+]
