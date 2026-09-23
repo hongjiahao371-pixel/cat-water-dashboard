@@ -436,13 +436,14 @@ services:
     - LISTEN_URL=http://0.0.0.0:39100/live.flv
     - HWACCEL_MODE=cpu
     - SCALE_WIDTH=960
-    - PRESET=ultrafast
+    - PRESET=veryfast
     - GOP=30
     - MAXRATE=3000k
     - BUFSIZE=6000k
     - OUTPUT_FPS=8
     - CRF=23
     - TRANSCODE_STATUS_FILE=/app/data/transcode_status.json
+    - LIBVA_DRIVER_NAME=iHD
     group_add:
     - '44'
     - '105'
@@ -462,6 +463,11 @@ services:
     - 39100:39100
     restart: unless-stopped
     volumes:
+    - /usr/lib/x86_64-linux-gnu/libmfx-gen:/usr/lib/x86_64-linux-gnu/libmfx-gen:ro
+    - /usr/lib/x86_64-linux-gnu/libmfx-gen.so.1.2:/usr/lib/x86_64-linux-gnu/libmfx-gen.so.1.2:ro
+    - /usr/lib/x86_64-linux-gnu/libigdgmm.so.12:/usr/lib/x86_64-linux-gnu/libigdgmm.so.12:ro
+    - /usr/lib/x86_64-linux-gnu/libigdgmm.so.12.10.0:/usr/lib/x86_64-linux-gnu/libigdgmm.so.12.10.0:ro
+    - /usr/lib/x86_64-linux-gnu/dri/iHD_drv_video.so:/usr/lib/x86_64-linux-gnu/dri/iHD_drv_video.so:ro
     - /dev/dri:/dev/dri
     - ./data:/app/data
     - ./media:/app/media
