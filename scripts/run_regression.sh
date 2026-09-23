@@ -3,7 +3,7 @@
 # Run: docker exec cat-water-detector python3 - < tests/regression_accuracy.py
 # Alerts to Feishu webhook on FAIL or crash. Retains 30 days of logs.
 set -u
-REPO=/volume1/docker/cat-water-dashboard
+REPO="$(cd "$(dirname "$0")/.." \&\& pwd)"
 LOG_DIR="$REPO/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/regression_$(date +%Y%m%d).log"

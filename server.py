@@ -2411,6 +2411,8 @@ class Handler(SimpleHTTPRequestHandler):
                 clip_start, clip_end = event_clip_window(event, archive_verification)
             except ValueError as exc:
                 return self._send_json({'ok': False, 'error': str(exc)}, 400)
+            if not EASYNVR_RECORD_ROOT.strip():
+                return self._send_json({'ok': False, 'error': 'archive extraction not configured (EASYNVR_RECORD_ROOT empty)'}, 501)
             clip_duration = max(4, (clip_end - clip_start).total_seconds())
             # Collect recording files across date boundaries
             dates = set()

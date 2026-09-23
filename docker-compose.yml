@@ -43,7 +43,7 @@ services:
     - ./camera_drift.py:/app/camera_drift.py:ro
     - ./index.html:/app/index.html:ro
     - /volume1/@appstore/com.ugreen.docker.easynvr:/easynvr:ro
-    - /volume1/docker/easynvr_rec:/easynvr_rec:ro
+    - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
   cat-water-training-crops:
     command:
     - python3
@@ -170,7 +170,7 @@ services:
     - ./data:/app/data
     - ./media:/app/media
     - ./models:/app/models:ro
-    - /volume1/docker/easynvr_rec:/easynvr_rec:ro
+    - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
     - ./server.py:/app/server.py:ro
     - ./auth.js:/app/auth.js:ro
     - ./notification_delivery.py:/app/notification_delivery.py:ro
@@ -259,7 +259,7 @@ services:
     - ./detection_worker.py:/app/detection_worker.py:ro
     - ./archive_verifier_worker.py:/app/archive_verifier_worker.py:ro
     - ./daily_audit_worker.py:/app/daily_audit_worker.py:ro
-    - /volume1/docker/easynvr_rec:/easynvr_rec:ro
+    - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
   cat-water-archive-verifier:
     command:
     - python3

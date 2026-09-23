@@ -86,6 +86,8 @@ def file_start_time(path):
 
 
 def recording_files(day):
+    if not str(RECORD_ROOT).strip():
+        return []
     directory = RECORD_ROOT / day.strftime('%Y%m%d')
     if not directory.is_dir():
         return []
