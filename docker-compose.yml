@@ -1,485 +1,166 @@
+# 单容器形态：全部 worker 由 supervisor.py 在容器内托管。
+# 回滚到多容器形态：docker-compose.multi.yml（保留在同一目录）。
 services:
-  cat-water-backfill:
+  cat-water:
     command:
     - python3
     - -u
-    - recording_backfill_worker.py
-    container_name: cat-water-backfill
-    profiles:
-    - maintenance
-    depends_on:
-    - cat-water-dashboard
+    - supervisor.py
+    container_name: cat-water
+    cpus: '6.0'
     environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
-    - EASYNVR_DB_PATH=/easynvr/configs/data.db
-    - EASYNVR_RECORD_ROOT=/easynvr_rec
-    - BACKFILL_CHANNEL_ID=
-    - BACKFILL_POLL_SEC=120
-    - BACKFILL_LOOKBACK_MIN=180
-    - BACKFILL_ANALYZE_FPS=1
-    - BACKFILL_WRITE_EVENTS=false
-    - CAT_SCORE_THRESHOLD=0.40
-    - CAT_CROP_SCORE_THRESHOLD=0.25
-    - CAT_HINT_MOTION_THRESHOLD=3.0
-    - LICK_MIN_SIGNAL=2.0
-    - DRINK_CONFIRM_MIN_SIGNAL=2.5
-    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
-    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
-    group_add:
-    - '44'
-    - '105'
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    restart: unless-stopped
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./detection_worker.py:/app/detection_worker.py:ro
-    - ./recording_backfill_worker.py:/app/recording_backfill_worker.py:ro
-    - ./camera_drift.py:/app/camera_drift.py:ro
-    - ./index.html:/app/index.html:ro
-    - /volume1/@appstore/com.ugreen.docker.easynvr:/easynvr:ro
-    - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
-  cat-water-training-crops:
-    command:
-    - python3
-    - -u
-    - prepare_training_crops.py
-    profiles:
-    - maintenance
-    environment:
-    - TZ=Asia/Shanghai
-    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
-    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
-    - NIGHT_HIRES_ENABLED=false
-    restart: 'no'
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./detection_worker.py:/app/detection_worker.py:ro
-    - ./prepare_training_crops.py:/app/prepare_training_crops.py:ro
-  cat-water-model-trainer:
-    command:
-    - python3
-    - -u
-    - classifier_calibration_worker.py
-    container_name: cat-water-model-trainer
-    environment:
-    - TZ=Asia/Shanghai
-    - MODEL_TRAINING_POLL_SEC=1800
-    - MODEL_TRAINING_MIN_POSITIVE=50
-    - MODEL_TRAINING_MIN_NEGATIVE=20
-    - MODEL_TRAINING_MIN_PRECISION=0.90
-    - MODEL_TRAINING_MIN_RECALL=0.80
-    - DRINKING_CLASSIFIER_THRESHOLD=0.60
-    - DRINKING_CLASSIFIER_PATH=/app/models/cat_drinking_classifier.onnx
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/model_training_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<28800 else 1)
-      interval: 300s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-    volumes:
-    - ./data:/app/data
-    - ./models:/app/models:ro
-    - ./classifier_calibration_worker.py:/app/classifier_calibration_worker.py:ro
-  cat-water-camera:
-    command:
-    - python3
-    - -u
-    - camera_worker.py
-    container_name: cat-water-camera
-    depends_on:
-    - cat-water-dashboard
-    environment:
-    - TZ=Asia/Shanghai
-    - CAMERA_STREAM_URL=${CAMERA_SOURCE_URL:-}
+    - ACTIVE_LAPPING_MAX_CREDIT_SEC=0.50
+    - ACTIVE_LAPPING_MAX_GAP_SEC=2.0
+    - ACTIVE_LAPPING_MIN_IOU=0.20
+    - ARCHIVE_AUTO_RECOVERY_ENABLED=true
+    - ARCHIVE_AUTO_RECOVERY_MAX_PER_POLL=3
+    - ARCHIVE_AUTO_RECOVERY_MIN_CONFIDENCE=0.15
+    - ARCHIVE_VERIFY_ANCHOR_MIN_IOU=0.20
+    - ARCHIVE_VERIFY_ANCHOR_WINDOW_SEC=15
+    - ARCHIVE_VERIFY_FPS=2
+    - ARCHIVE_VERIFY_LOOKBACK_HOURS=24
+    - ARCHIVE_VERIFY_POLL_SEC=60
+    - ARCHIVE_VERIFY_RECOVERY_LOOKBACK_HOURS=168
+    - ARCHIVE_VERIFY_REJECT_MAX_CONFIDENCE=0.35
+    - ARCHIVE_VERIFY_WAIT_SEC=180
+    - BEST_CANDIDATE_HOLD_SEC=3.0
+    - BUFSIZE=6000k
+    - CAMERA_ANALYSIS_STREAM_URL=http://127.0.0.1:39100/live.flv
     - CAMERA_CAPTURE_INTERVAL_SEC=5
-    - CAMERA_SNAPSHOT_STALE_SEC=45
     - CAMERA_CAPTURE_TIMEOUT_SEC=20
-    group_add:
-    - '44'
-    - '105'
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/camera_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<90 else 1)
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./camera_worker.py:/app/camera_worker.py:ro
-  cat-water-dashboard:
-    container_name: cat-water-dashboard
-    environment:
-    - TZ=Asia/Shanghai
     - CAMERA_LIVE_STREAM_URL=${CAMERA_SOURCE_URL:-}
-    - CAMERA_LIVE_STREAM_URL_HD=${CAMERA_LIVE_STREAM_URL_HD:-http://cat-water-qsv-transcode:39100/live.flv}
+    - CAMERA_LIVE_STREAM_URL_HD=http://127.0.0.1:39100/live.flv
+    - CAMERA_SNAPSHOT_STALE_SEC=45
+    - CAMERA_STREAM_URL=${CAMERA_SOURCE_URL:-}
+    - CAT_CROP_SCORE_THRESHOLD=0.25
+    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
+    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
+    - CAT_SCORE_THRESHOLD=0.40
+    - CAT_TRACK_MIN_IOU=0.15
+    - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
+    - CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD=0.80
+    - CLASSIFIER_TEMPORAL_MIN_HITS=2
+    - CLASSIFIER_TEMPORAL_MIN_IOU=0.10
+    - CONSECUTIVE_FRAMES_REQUIRED=2
+    - CRF=23
+    - DAILY_AUDIT_ANALYZE_FPS=2
+    - DAILY_AUDIT_MOTION_THRESHOLD=12
+    - DAILY_AUDIT_POLL_SEC=300
+    - DAILY_AUDIT_PREFILTER_INTERVAL_SEC=10
+    - DAILY_AUDIT_PREFILTER_MIN_CLASSIFIER=0.15
+    - DAILY_AUDIT_QUICK_ANALYZE_FPS=1
+    - DAILY_AUDIT_RECORD_ROOT=${DAILY_AUDIT_RECORD_ROOT:-}
+    - DAILY_AUDIT_RUN_TIME=03:30
+    - DASHBOARD_API_URL=http://127.0.0.1:39095
+    - DETECTOR_INTERVAL_SEC=1.0
+    - DETECTOR_MOTION_THRESHOLD=8
+    - DETECTOR_STREAM_OPEN_TIMEOUT_SEC=10
+    - DETECTOR_STREAM_READ_TIMEOUT_SEC=8
+    - DRINKING_CLASSIFIER_PATH=/app/models/cat_drinking_classifier.onnx
+    - DRINKING_CLASSIFIER_THRESHOLD=0.60
+    - DRINK_CANDIDATE_GAP_SEC=0.8
     - EASYNVR_BASE_URL=${EASYNVR_BASE_URL:-}
-    - EASYNVR_USERNAME=${EASYNVR_USERNAME:-}
-    - EASYNVR_PASSWORD=${EASYNVR_PASSWORD:-}
     - EASYNVR_CHANNEL_ID=${EASYNVR_CHANNEL_ID:-}
     - EASYNVR_CHANNEL_ID_HD=${EASYNVR_CHANNEL_ID_HD:-}
     - EASYNVR_CHANNEL_ID_SMOOTH=${EASYNVR_CHANNEL_ID_SMOOTH:-}
+    - EASYNVR_PASSWORD=${EASYNVR_PASSWORD:-}
     - EASYNVR_RECORD_ROOT=${EASYNVR_RECORD_ROOT:-}
-    - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
+    - EASYNVR_USERNAME=${EASYNVR_USERNAME:-}
+    - EVENT_EVIDENCE_ENABLED=true
+    - EVENT_EVIDENCE_FPS=5
+    - EVENT_POSTBUFFER_SEC=8
+    - EVENT_PREBUFFER_SEC=8
+    - GOP=30
+    - HWACCEL_MODE=cpu
+    - LIBVA_DRIVER_NAME=iHD
+    - LISTEN_URL=http://0.0.0.0:39100/live.flv
+    - LOCATE_EVIDENCE_MAX_EVENTS=200
+    - LOCATE_IMAGE_MAX_EDGE=672
+    - LOCATE_LOOKBACK_DAYS=30
+    - LOCATE_MAX_FRAMES=3
+    - LOCATE_MAX_LOAD=3.5
+    - LOCATE_MAX_LOCALIZED_BOX_AREA_RATIO=0.12
+    - LOCATE_MAX_PER_POLL=1
+    - LOCATE_MIN_COHERENT_IOU=0.08
+    - LOCATE_MIN_COHERENT_PAIRS=2
+    - LOCATE_MIN_COMPLETE_FRAMES=3
+    - LOCATE_MIN_HITS=2
+    - LOCATE_MIN_HIT_RATIO=0.50
+    - LOCATE_MIN_INTERVAL_SEC=1800
+    - LOCATE_MIN_LOCALIZED_HITS=2
+    - LOCATE_MODE=slow
+    - LOCATE_MODEL_ID=locate-anything-q6_k:818ba69f0dd8
+    - LOCATE_MODEL_PATH=/models/locate-anything-q6_k.gguf
+    - LOCATE_POLL_SEC=60
+    - LOCATE_REQUIRE_ALL_FRAMES=true
+    - LOCATE_RESULTS_MAX_ITEMS=500
+    - LOCATE_SHADOW_MODE=true
+    - LOCATE_STRATEGY_ID=mouth-contact-all-frames-v2
+    - LOCATE_THREADS=3
+    - MAXRATE=3000k
+    - MODEL_TRAINING_MIN_NEGATIVE=20
+    - MODEL_TRAINING_MIN_POSITIVE=50
+    - MODEL_TRAINING_MIN_PRECISION=0.90
+    - MODEL_TRAINING_MIN_RECALL=0.80
+    - MODEL_TRAINING_POLL_SEC=1800
+    - NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD=0.85
+    - NIGHT_DRINKING_CLASSIFIER_THRESHOLD=0.75
+    - NIGHT_HIRES_ENABLED=false
+    - NIGHT_HIRES_RTSP_URL=${NIGHT_HIRES_RTSP_URL:-}
+    - NOTIFICATION_DAILY_WINDOW_HOURS=4
+    - NOTIFICATION_MAX_RETRIES=5
+    - NOTIFICATION_POLL_SEC=60
+    - OUTPUT_FPS=8
+    - PRESET=veryfast
+    - REVIEW_SAMPLE_COOLDOWN_SEC=180
+    - REVIEW_SAMPLE_ENABLED=true
+    - REVIEW_SAMPLE_MAX_CONFIDENCE=1.0
+    - REVIEW_SAMPLE_MAX_ITEMS=300
+    - REVIEW_SAMPLE_MIN_CONFIDENCE=0.15
+    - RTSP_URL=${CAMERA_SOURCE_URL:-}
+    - SCALE_WIDTH=960
+    - TRANSCODE_STATUS_FILE=/app/data/transcode_status.json
+    - TZ=Asia/Shanghai
     group_add:
     - '44'
     - '105'
     healthcheck:
-      interval: 30s
-      retries: 3
       test:
       - CMD
       - python3
       - -c
-      - from http.client import HTTPConnection; c = HTTPConnection('localhost', 39095,
-        timeout=2); c.request('GET', '/api/health'); r = c.getresponse(); raise SystemExit(0
-        if r.status == 200 else 1)
+      - import json,time; s=json.load(open('/app/data/supervisor_status.json')); raise SystemExit(0 if time.time()-s.get('updated_unix',0)<30 and not s.get('stopping') else 1)
+      interval: 20s
       timeout: 10s
-    build: .
+      retries: 3
+      start_period: 60s
     image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
     ports:
     - 39095:39095
+    - 39100:39100
     restart: unless-stopped
     volumes:
     - /dev/dri:/dev/dri
     - ./data:/app/data
     - ./media:/app/media
     - ./models:/app/models:ro
+    - ./models/locate-anything-q6_k.gguf:/models/locate-anything-q6_k.gguf:ro
     - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
-    - ./server.py:/app/server.py:ro
     - ./calibrate:/app/calibrate:ro
+    - ./server.py:/app/server.py:ro
     - ./auth.js:/app/auth.js:ro
     - ./notification_delivery.py:/app/notification_delivery.py:ro
+    - ./supervisor.py:/app/supervisor.py:ro
+    - ./detection_worker.py:/app/detection_worker.py:ro
+    - ./camera_worker.py:/app/camera_worker.py:ro
+    - ./hd_live_worker.py:/app/hd_live_worker.py:ro
+    - ./archive_verifier_worker.py:/app/archive_verifier_worker.py:ro
+    - ./daily_audit_worker.py:/app/daily_audit_worker.py:ro
+    - ./notification_worker.py:/app/notification_worker.py:ro
+    - ./classifier_calibration_worker.py:/app/classifier_calibration_worker.py:ro
+    - ./locate_verifier_worker.py:/app/locate_verifier_worker.py:ro
     - ./events/index.html:/app/events/index.html:ro
     - ./settings/index.html:/app/settings/index.html:ro
     - ./review/index.html:/app/review/index.html:ro
     - ./push/index.html:/app/push/index.html:ro
     - ./api/index.html:/app/api/index.html:ro
-    - ./index.html:/app/index.html:ro
-  cat-water-notifier:
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    command:
-    - python3
-    - -u
-    - notification_worker.py
-    container_name: cat-water-notifier
-    depends_on:
-    - cat-water-dashboard
-    environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - NOTIFICATION_POLL_SEC=60
-    - NOTIFICATION_MAX_RETRIES=5
-    - NOTIFICATION_DAILY_WINDOW_HOURS=4
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/notification_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<180 else 1)
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-    volumes:
-    - ./data:/app/data
-    - ./notification_delivery.py:/app/notification_delivery.py:ro
-    - ./notification_worker.py:/app/notification_worker.py:ro
-  cat-water-daily-audit:
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    command:
-    - python3
-    - -u
-    - daily_audit_worker.py
-    container_name: cat-water-daily-audit
-    cpus: '3.0'
-    depends_on:
-    - cat-water-dashboard
-    group_add:
-    - '44'
-    - '105'
-    environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - DAILY_AUDIT_RECORD_ROOT=${DAILY_AUDIT_RECORD_ROOT:-}
-    - DAILY_AUDIT_RUN_TIME=03:30
-    - DAILY_AUDIT_POLL_SEC=300
-    - DAILY_AUDIT_PREFILTER_INTERVAL_SEC=10
-    - DAILY_AUDIT_PREFILTER_MIN_CLASSIFIER=0.15
-    - DAILY_AUDIT_MOTION_THRESHOLD=12
-    - DAILY_AUDIT_ANALYZE_FPS=2
-    - DAILY_AUDIT_QUICK_ANALYZE_FPS=1
-    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
-    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
-    - DRINKING_CLASSIFIER_PATH=/app/models/cat_drinking_classifier.onnx
-    - NIGHT_HIRES_ENABLED=false
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/daily_audit_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<900 else 1)
-      interval: 120s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./detection_worker.py:/app/detection_worker.py:ro
-    - ./archive_verifier_worker.py:/app/archive_verifier_worker.py:ro
-    - ./daily_audit_worker.py:/app/daily_audit_worker.py:ro
-    - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
-  cat-water-archive-verifier:
-    command:
-    - python3
-    - -u
-    - archive_verifier_worker.py
-    container_name: cat-water-archive-verifier
-    depends_on:
-    - cat-water-dashboard
-    environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
-    - ARCHIVE_VERIFY_POLL_SEC=60
-    - ARCHIVE_VERIFY_WAIT_SEC=180
-    - ARCHIVE_VERIFY_LOOKBACK_HOURS=24
-    - ARCHIVE_VERIFY_RECOVERY_LOOKBACK_HOURS=168
-    - ARCHIVE_VERIFY_FPS=2
-    - ARCHIVE_VERIFY_REJECT_MAX_CONFIDENCE=0.35
-    - ARCHIVE_VERIFY_ANCHOR_WINDOW_SEC=15
-    - ARCHIVE_VERIFY_ANCHOR_MIN_IOU=0.20
-    - ARCHIVE_AUTO_RECOVERY_ENABLED=true
-    - ARCHIVE_AUTO_RECOVERY_MIN_CONFIDENCE=0.15
-    - ARCHIVE_AUTO_RECOVERY_MAX_PER_POLL=3
-    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
-    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
-    - DRINKING_CLASSIFIER_PATH=/app/models/cat_drinking_classifier.onnx
-    - CONSECUTIVE_FRAMES_REQUIRED=2
-    - NIGHT_HIRES_ENABLED=false
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/archive_verifier_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<600 else 1)
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./detection_worker.py:/app/detection_worker.py:ro
-    - ./archive_verifier_worker.py:/app/archive_verifier_worker.py:ro
-  cat-water-locate-verifier:
-    command:
-    - python3
-    - -u
-    - locate_verifier_worker.py
-    container_name: cat-water-locate-verifier
-    depends_on:
-    - cat-water-dashboard
-    build:
-      context: .
-      dockerfile: Dockerfile.locate
-    image: cat-water-locate-verifier:20260821
-    cpus: '3.0'
-    mem_limit: 8g
-    environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - LOCATE_MODEL_PATH=/models/locate-anything-q6_k.gguf
-    - LOCATE_MODEL_ID=locate-anything-q6_k:818ba69f0dd8
-    - LOCATE_STRATEGY_ID=mouth-contact-all-frames-v2
-    - LOCATE_MODE=slow
-    - LOCATE_THREADS=3
-    - LOCATE_IMAGE_MAX_EDGE=672
-    - LOCATE_MAX_FRAMES=3
-    - LOCATE_MIN_HITS=2
-    - LOCATE_MIN_HIT_RATIO=0.50
-    - LOCATE_MIN_COHERENT_IOU=0.08
-    - LOCATE_MIN_COHERENT_PAIRS=2
-    - LOCATE_MIN_COMPLETE_FRAMES=3
-    - LOCATE_MIN_LOCALIZED_HITS=2
-    - LOCATE_MAX_LOCALIZED_BOX_AREA_RATIO=0.12
-    - LOCATE_REQUIRE_ALL_FRAMES=true
-    - LOCATE_MAX_LOAD=3.5
-    - LOCATE_MAX_PER_POLL=1
-    - LOCATE_POLL_SEC=60
-    - LOCATE_MIN_INTERVAL_SEC=1800
-    - LOCATE_LOOKBACK_DAYS=30
-    - LOCATE_RESULTS_MAX_ITEMS=500
-    - LOCATE_EVIDENCE_MAX_EVENTS=200
-    - LOCATE_SHADOW_MODE=true
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/locate_verifier_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<1200 else 1)
-      interval: 120s
-      timeout: 10s
-      retries: 3
-      start_period: 900s
-    restart: unless-stopped
-    stop_grace_period: 30s
-    volumes:
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models/locate-anything-q6_k.gguf:/models/locate-anything-q6_k.gguf:ro
-    - ./locate_verifier_worker.py:/app/locate_verifier_worker.py:ro
-  cat-water-detector:
-    command:
-    - python3
-    - -u
-    - detection_worker.py
-    container_name: cat-water-detector
-    depends_on:
-    - cat-water-dashboard
-    environment:
-    - TZ=Asia/Shanghai
-    - DASHBOARD_API_URL=http://cat-water-dashboard:39095
-    - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
-    - CAMERA_ANALYSIS_STREAM_URL=http://cat-water-qsv-transcode:39100/live.flv
-    - DETECTOR_MOTION_THRESHOLD=8
-    - CAT_SCORE_THRESHOLD=0.40
-    - CAT_CROP_SCORE_THRESHOLD=0.25
-    - DETECTOR_INTERVAL_SEC=1.0
-    - DETECTOR_STREAM_OPEN_TIMEOUT_SEC=10
-    - DETECTOR_STREAM_READ_TIMEOUT_SEC=8
-    - CAT_DETECT_PROVIDER_PREFERENCE=cpu
-    - CAT_DETECTOR_MODEL_PATH=/app/models/yolov8n_640_opset21.onnx
-    - DRINKING_CLASSIFIER_PATH=/app/models/cat_drinking_classifier.onnx
-    - DRINKING_CLASSIFIER_THRESHOLD=0.60
-    - NIGHT_DRINKING_CLASSIFIER_THRESHOLD=0.75
-    - CONSECUTIVE_FRAMES_REQUIRED=2
-    - CAT_TRACK_MIN_IOU=0.15
-    - CLASSIFIER_TEMPORAL_MIN_IOU=0.10
-    - DRINK_CANDIDATE_GAP_SEC=0.8
-    - CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD=0.80
-    - NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD=0.85
-    - CLASSIFIER_TEMPORAL_MIN_HITS=2
-    - BEST_CANDIDATE_HOLD_SEC=3.0
-    - ACTIVE_LAPPING_MAX_GAP_SEC=2.0
-    - ACTIVE_LAPPING_MIN_IOU=0.20
-    - ACTIVE_LAPPING_MAX_CREDIT_SEC=0.50
-    - REVIEW_SAMPLE_ENABLED=true
-    - REVIEW_SAMPLE_MIN_CONFIDENCE=0.15
-    - REVIEW_SAMPLE_MAX_CONFIDENCE=1.0
-    - REVIEW_SAMPLE_COOLDOWN_SEC=180
-    - REVIEW_SAMPLE_MAX_ITEMS=300
-    - EVENT_EVIDENCE_ENABLED=true
-    - EVENT_EVIDENCE_FPS=5
-    - EVENT_PREBUFFER_SEC=8
-    - EVENT_POSTBUFFER_SEC=8
-    - NIGHT_HIRES_RTSP_URL=${NIGHT_HIRES_RTSP_URL:-}
-    - NIGHT_HIRES_ENABLED=false
-    group_add:
-    - '44'
-    - '105'
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/detector_status.json')); raise SystemExit(0 if s.get('ok') and time.time()-s.get('updated_unix',0)<30 else 1)
-      interval: 20s
-      timeout: 10s
-      retries: 3
-      start_period: 45s
-    restart: unless-stopped
-    volumes:
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./detection_worker.py:/app/detection_worker.py:ro
-  cat-water-qsv-transcode:
-    command:
-    - python3
-    - -u
-    - hd_live_worker.py
-    container_name: cat-water-qsv-transcode
-    environment:
-    - TZ=Asia/Shanghai
-    - RTSP_URL=${CAMERA_SOURCE_URL:-}
-    - LISTEN_URL=http://0.0.0.0:39100/live.flv
-    - HWACCEL_MODE=cpu
-    - SCALE_WIDTH=960
-    - PRESET=veryfast
-    - GOP=30
-    - MAXRATE=3000k
-    - BUFSIZE=6000k
-    - OUTPUT_FPS=8
-    - CRF=23
-    - TRANSCODE_STATUS_FILE=/app/data/transcode_status.json
-    - LIBVA_DRIVER_NAME=iHD
-    group_add:
-    - '44'
-    - '105'
-    build: .
-    image: ghcr.io/hongjiahao371-pixel/cat-water-dashboard:latest
-    healthcheck:
-      test:
-      - CMD
-      - python3
-      - -c
-      - import json,time; s=json.load(open('/app/data/transcode_status.json')); raise SystemExit(0 if s.get('ok') and s.get('phase') == 'running' and time.time()-s.get('updated_unix',0)<30 else 1)
-      interval: 20s
-      timeout: 10s
-      retries: 3
-      start_period: 45s
-    ports:
-    - 39100:39100
-    restart: unless-stopped
-    volumes:
-    - /usr/lib/x86_64-linux-gnu/libmfx-gen:/usr/lib/x86_64-linux-gnu/libmfx-gen:ro
-    - /usr/lib/x86_64-linux-gnu/libmfx-gen.so.1.2:/usr/lib/x86_64-linux-gnu/libmfx-gen.so.1.2:ro
-    - /usr/lib/x86_64-linux-gnu/libigdgmm.so.12:/usr/lib/x86_64-linux-gnu/libigdgmm.so.12:ro
-    - /usr/lib/x86_64-linux-gnu/libigdgmm.so.12.10.0:/usr/lib/x86_64-linux-gnu/libigdgmm.so.12.10.0:ro
-    - /usr/lib/x86_64-linux-gnu/dri/iHD_drv_video.so:/usr/lib/x86_64-linux-gnu/dri/iHD_drv_video.so:ro
-    - /dev/dri:/dev/dri
-    - ./data:/app/data
-    - ./media:/app/media
-    - ./models:/app/models:ro
-    - ./hd_live_worker.py:/app/hd_live_worker.py:ro

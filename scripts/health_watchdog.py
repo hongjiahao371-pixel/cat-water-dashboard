@@ -19,11 +19,7 @@ STATE_FILE = DATA / 'health_alert_state.json'
 COOLDOWN_SEC = 6 * 3600
 FRESHNESS_SEC = 600  # heartbeat older than 10 min => stale
 
-EXPECTED = {
-    'cat-water-archive-verifier', 'cat-water-camera', 'cat-water-dashboard',
-    'cat-water-daily-audit', 'cat-water-detector', 'cat-water-model-trainer',
-    'cat-water-notifier', 'cat-water-qsv-transcode',
-}
+EXPECTED = {'cat-water'}
 STATUS_FILES = [
     ('detector', 'detector_status.json'),
     ('transcode', 'transcode_status.json'),
@@ -40,7 +36,7 @@ def fresh(payload):
 # 1. containers
 try:
     out = subprocess.run(
-        ['docker', 'ps', '--filter', 'name=cat-water-', '--format', '{{.Names}}|{{.Status}}'],
+        ['docker', 'ps', '--filter', 'name=cat-water', '--format', '{{.Names}}|{{.Status}}'],
         capture_output=True, text=True, timeout=30,
     ).stdout
     running, unhealthy = set(), []
