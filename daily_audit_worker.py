@@ -20,7 +20,7 @@ import detection_worker as detector_module
 DASHBOARD_API_URL = os.environ.get('DASHBOARD_API_URL', 'http://cat-water-dashboard:39095')
 RECORD_ROOT = Path(os.environ.get(
     'DAILY_AUDIT_RECORD_ROOT',
-    '/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1',
+    os.environ.get('EASYNVR_RECORD_ROOT', ''),
 ))
 STATUS_FILE = Path(os.environ.get('DAILY_AUDIT_STATUS_FILE', '/app/data/daily_audit_status.json'))
 STATE_FILE = Path(os.environ.get('DAILY_AUDIT_STATE_FILE', '/app/data/daily_audit_state.json'))

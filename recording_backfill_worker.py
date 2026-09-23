@@ -22,7 +22,7 @@ BACKFILL_STATE_FILE = Path(os.environ.get('BACKFILL_STATE_FILE', '/app/data/back
 BACKFILL_POLL_SEC = float(os.environ.get('BACKFILL_POLL_SEC', '30'))
 BACKFILL_LOOKBACK_MIN = int(os.environ.get('BACKFILL_LOOKBACK_MIN', '180'))
 BACKFILL_ANALYZE_FPS = float(os.environ.get('BACKFILL_ANALYZE_FPS', '4'))
-BACKFILL_CHANNEL_ID = os.environ.get('BACKFILL_CHANNEL_ID', os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', 'OpD6HNpPU8j0X_profile_2'))
+BACKFILL_CHANNEL_ID = os.environ.get('BACKFILL_CHANNEL_ID', os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', ''))
 BACKFILL_MIN_FILE_MB = float(os.environ.get('BACKFILL_MIN_FILE_MB', '1.5'))
 BACKFILL_MAX_PROCESSED_TRACK = int(os.environ.get('BACKFILL_MAX_PROCESSED_TRACK', '500'))
 BACKFILL_USE_FFMPEG = os.environ.get('BACKFILL_USE_FFMPEG', '1') == '1'

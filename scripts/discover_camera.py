@@ -6,7 +6,7 @@ time reading on most cameras. Helps you fill CAMERA_SOURCE_URL / CAMERA_IP
 in .env:
 
     python3 scripts/discover_camera.py            # discover + verify time
-    python3 scripts/discover_camera.py 192.168.5.41
+    python3 scripts/discover_camera.py 192.168.1.100
 
 Then point a test player at rtsp://user:pass@<ip>:554/<profile> to confirm
 the stream, and put the URL into .env as CAMERA_SOURCE_URL.

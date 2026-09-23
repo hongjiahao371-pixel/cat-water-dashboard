@@ -57,6 +57,7 @@ API_TOKEN = os.environ.get('CAT_WATER_API_TOKEN', '').strip()
 EASYNVR_CHANNEL_ID = os.environ.get('EASYNVR_CHANNEL_ID', '')
 EASYNVR_CHANNEL_ID_HD = os.environ.get('EASYNVR_CHANNEL_ID_HD', EASYNVR_CHANNEL_ID)
 EASYNVR_CHANNEL_ID_SMOOTH = os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', EASYNVR_CHANNEL_ID)
+EASYNVR_RECORD_ROOT = os.environ.get('EASYNVR_RECORD_ROOT', '')
 MEDIA_DIR = BASE_DIR / 'media'
 MEDIA_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
@@ -2419,7 +2420,7 @@ class Handler(SimpleHTTPRequestHandler):
                 d += timedelta(days=1)
             all_files = []
             for ds in sorted(dates):
-                rec_dir = Path(f'/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1/{ds}')
+                rec_dir = Path(EASYNVR_RECORD_ROOT) / ds
                 if rec_dir.exists():
                     for f in sorted(rec_dir.glob('*.mp4')):
                         if len(f.name) >= 14 and f.name[:14].isdigit():

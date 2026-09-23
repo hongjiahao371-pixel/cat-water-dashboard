@@ -63,7 +63,7 @@ mkdir -p models
 python3 scripts/discover_camera.py
 # 在局域网内发现 ONVIF 相机并验证连通与时钟
 # 用播放器确认取流地址可用, 例如:
-#   ffplay 'rtsp://user:pass@192.168.5.41:554/stream1'
+#   ffplay 'rtsp://user:pass@192.168.1.100:554/stream1'
 # 然后写入 .env 的 CAMERA_SOURCE_URL (直连 RTSP 即可, 无需 EasyNVR)
 
 cp .env.example .env
@@ -169,3 +169,15 @@ ROI-only episodes and a noon negative control. Close-up frames where whole-cat Y
 are the main source of legacy misses; the archive verifier consumes the same ROI evidence.
 Fallback to the legacy path remains automatic when the config is disabled or the model fails.
 See accuracy-20260908/full-day/PROGRESS.md and accuracy-20260908/recovery-20260918/.
+
+## 开源说明与许可
+
+- 本项目代码以 MIT 许可发布（见 LICENSE）。
+- 检测模型由用户自行获取：YOLOv8n/YOLO26 权重遵循 Ultralytics 的 AGPL-3.0
+  等许可；LocateAnything (gguf) 遵循 NVIDIA 模型许可。两者均不入库、不分发，
+  使用者自行下载并承担相应许可义务。
+- `models/roi_drinking_20260908.onnx` 是针对特定相机视角训练的个性化模型，
+  对你的相机无效——请按 `training/README.md` 用你自己相机的审核样本重训，
+  训练参考实现见 `training/`。
+- 全部数据处理在局域网内完成，不依赖任何云服务；相机与 NAS 的地址、账号
+  仅保存在本机 `.env` 与 `data/`（均已 gitignore）。
