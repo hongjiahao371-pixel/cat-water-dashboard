@@ -44,15 +44,19 @@ POSITIVE_DIR = DATA_DIR / 'positive'
 NEGATIVE_DIR = DATA_DIR / 'negative'
 LABEL_ORPHAN_DIR = DATA_DIR / 'label_orphans'
 LEGACY_CAMERA_LIVE_STREAM_URL = os.environ.get('CAMERA_LIVE_STREAM_URL', '')
-CAMERA_LIVE_STREAM_URL_HD = os.environ.get('CAMERA_LIVE_STREAM_URL_HD', 'http://192.168.5.17:39100/live.flv')
+CAMERA_LIVE_STREAM_URL_HD = os.environ.get(
+    'CAMERA_LIVE_STREAM_URL_HD', 'http://cat-water-qsv-transcode:39100/live.flv')
 CAMERA_LIVE_STREAM_URL_SMOOTH = os.environ.get('CAMERA_LIVE_STREAM_URL_SMOOTH', '')
-EASYNVR_BASE_URL = os.environ.get('EASYNVR_BASE_URL', 'http://192.168.5.17:10000')
-EASYNVR_USERNAME = os.environ.get('EASYNVR_USERNAME', 'admin')
-EASYNVR_PASSWORD = os.environ.get('EASYNVR_PASSWORD', 'admin')
+# EasyNVR is an optional add-on (HD playback / archive extraction). Leave
+# EASYNVR_BASE_URL empty when running without it: the dependent endpoints
+# degrade to clean errors instead of reaching for a hardcoded address.
+EASYNVR_BASE_URL = os.environ.get('EASYNVR_BASE_URL', '')
+EASYNVR_USERNAME = os.environ.get('EASYNVR_USERNAME', '')
+EASYNVR_PASSWORD = os.environ.get('EASYNVR_PASSWORD', '')
 API_TOKEN = os.environ.get('CAT_WATER_API_TOKEN', '').strip()
-EASYNVR_CHANNEL_ID = os.environ.get('EASYNVR_CHANNEL_ID', 'OpD6HNpPU8j0X_profile_1')
+EASYNVR_CHANNEL_ID = os.environ.get('EASYNVR_CHANNEL_ID', '')
 EASYNVR_CHANNEL_ID_HD = os.environ.get('EASYNVR_CHANNEL_ID_HD', EASYNVR_CHANNEL_ID)
-EASYNVR_CHANNEL_ID_SMOOTH = os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', 'OpD6HNpPU8j0X_profile_2')
+EASYNVR_CHANNEL_ID_SMOOTH = os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', EASYNVR_CHANNEL_ID)
 MEDIA_DIR = BASE_DIR / 'media'
 MEDIA_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
@@ -79,7 +83,7 @@ def live_flv_url(mode='smooth'):
 
 DEFAULT_SETTINGS = {
     'cameraName': 'cat-water-cam-01',
-    'rtspUrl': 'rtsp://admin:***@192.168.5.30:554/stream1',
+    'rtspUrl': '',
     'roi': {'x1': 820, 'y1': 540, 'x2': 1320, 'y2': 980},
     'fpsSample': 2,
     'minPresenceSec': 3,
@@ -1606,6 +1610,8 @@ def stream_mjpeg(handler, mode='smooth'):
 
 def easynvr_login():
     with STREAM_LOCK:
+        if not EASYNVR_BASE_URL.strip():
+            return None
         if EASYNVR_SESSION['token'] and EASYNVR_SESSION['expired_at'] > time() + 60:
             return EASYNVR_SESSION['token']
         payload = json.dumps({'username': EASYNVR_USERNAME, 'password': EASYNVR_PASSWORD}).encode('utf-8')

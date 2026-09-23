@@ -106,7 +106,7 @@ services:
     - cat-water-dashboard
     environment:
     - TZ=Asia/Shanghai
-    - CAMERA_STREAM_URL=http://192.168.5.17:10000/live/OpD6HNpPU8j0X_profile_2.flv
+    - CAMERA_STREAM_URL=${CAMERA_SOURCE_URL:-}
     - CAMERA_CAPTURE_INTERVAL_SEC=5
     - CAMERA_SNAPSHOT_STALE_SEC=45
     - CAMERA_CAPTURE_TIMEOUT_SEC=20
@@ -136,7 +136,14 @@ services:
     container_name: cat-water-dashboard
     environment:
     - TZ=Asia/Shanghai
-    - CAMERA_LIVE_STREAM_URL=http://192.168.5.17:10000/live/OpD6HNpPU8j0X_profile_2.flv
+    - CAMERA_LIVE_STREAM_URL=${CAMERA_SOURCE_URL:-}
+    - CAMERA_LIVE_STREAM_URL_HD=${CAMERA_LIVE_STREAM_URL_HD:-http://cat-water-qsv-transcode:39100/live.flv}
+    - EASYNVR_BASE_URL=${EASYNVR_BASE_URL:-}
+    - EASYNVR_USERNAME=${EASYNVR_USERNAME:-}
+    - EASYNVR_PASSWORD=${EASYNVR_PASSWORD:-}
+    - EASYNVR_CHANNEL_ID=${EASYNVR_CHANNEL_ID:-}
+    - EASYNVR_CHANNEL_ID_HD=${EASYNVR_CHANNEL_ID_HD:-}
+    - EASYNVR_CHANNEL_ID_SMOOTH=${EASYNVR_CHANNEL_ID_SMOOTH:-}
     - CAT_WATER_API_TOKEN=${CAT_WATER_API_TOKEN:-}
     group_add:
     - '44'
@@ -400,7 +407,7 @@ services:
     - EVENT_EVIDENCE_FPS=5
     - EVENT_PREBUFFER_SEC=8
     - EVENT_POSTBUFFER_SEC=8
-    - NIGHT_HIRES_RTSP_URL=http://192.168.5.17:10000/live/OpD6HNpPU8j0X_profile_2.flv
+    - NIGHT_HIRES_RTSP_URL=${NIGHT_HIRES_RTSP_URL:-}
     - NIGHT_HIRES_ENABLED=false
     group_add:
     - '44'
@@ -432,7 +439,7 @@ services:
     container_name: cat-water-qsv-transcode
     environment:
     - TZ=Asia/Shanghai
-    - RTSP_URL=http://192.168.5.17:10000/live/OpD6HNpPU8j0X_profile_2.flv
+    - RTSP_URL=${CAMERA_SOURCE_URL:-}
     - LISTEN_URL=http://0.0.0.0:39100/live.flv
     - HWACCEL_MODE=cpu
     - SCALE_WIDTH=960

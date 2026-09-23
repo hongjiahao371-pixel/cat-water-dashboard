@@ -59,12 +59,21 @@ mkdir -p models
 # 下载 yolov8n ONNX 模型放入 models/
 # 将 locate-anything-q6_k.gguf 放入 models/；必须遵守 NVIDIA 模型许可
 
-# 2. 配置环境变量
+# 2. 发现并配置相机
+python3 scripts/discover_camera.py
+# 在局域网内发现 ONVIF 相机并验证连通与时钟
+# 用播放器确认取流地址可用, 例如:
+#   ffplay 'rtsp://user:pass@192.168.5.41:554/stream1'
+# 然后写入 .env 的 CAMERA_SOURCE_URL (直连 RTSP 即可, 无需 EasyNVR)
+
 cp .env.example .env
-# 编辑 .env 填入摄像头 RTSP 地址
+# 编辑 .env: CAMERA_SOURCE_URL 填上一步确认的地址
+# 可选: EASYNVR_* 填写后启用高清播放/录像取证/巡检取证 (不填则优雅停用)
+# 可选: CAMERA_IP + CAMERA_USER/PASS 启用相机时钟漂移每日自动监控
 
 # 3. 启动
 docker compose up -d
+# 打开 http://<nas-ip>:39095/ 查看仪表盘
 
 # 可选：指定事件做一次影子复核
 docker compose run --rm cat-water-locate-verifier \
