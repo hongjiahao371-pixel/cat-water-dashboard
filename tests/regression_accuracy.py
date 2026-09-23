@@ -112,7 +112,12 @@ def main():
     ok = (c_ge >= MIN_CONFIRMED_GE_075
           and r_ge <= MAX_REJECTED_GE_060
           and n_ge <= MAX_NIGHT_REJECTED_GE_060)
-    print(f"\nRESULT: {'PASS' if ok else 'FAIL'}")
+    # Since 2026-09-21 the production drinking decision is the ROI classifier
+    # (roi_drinking.json); this crop model is only the automatic fallback, so
+    # its gates are telemetry, not the release gate. The active-path gate is
+    # scripts/run_replay_regression.sh (blind-label replay baseline).
+    print(f"\nRESULT (legacy-fallback telemetry, gating regression is "
+          f"replay_regression): {'PASS' if ok else 'BELOW-HISTORIC-BASELINE'}")
     print("  confirmed>=%.2f %s" % (RECALL_THRESHOLD, "OK" if c_ge >= MIN_CONFIRMED_GE_075 else "LOW"))
     print("  rejected>=%.2f %s" % (FP_THRESHOLD, "OK" if r_ge <= MAX_REJECTED_GE_060 else "HIGH"))
     print("  night-rejected>=%.2f %s" % (NIGHT_FP_THRESHOLD, "OK" if n_ge <= MAX_NIGHT_REJECTED_GE_060 else "HIGH"))
