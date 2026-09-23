@@ -44,15 +44,15 @@ POSITIVE_DIR = DATA_DIR / 'positive'
 NEGATIVE_DIR = DATA_DIR / 'negative'
 LABEL_ORPHAN_DIR = DATA_DIR / 'label_orphans'
 LEGACY_CAMERA_LIVE_STREAM_URL = os.environ.get('CAMERA_LIVE_STREAM_URL', '')
-CAMERA_LIVE_STREAM_URL_HD = os.environ.get('CAMERA_LIVE_STREAM_URL_HD', 'http://192.168.5.17:39100/live.flv')
+CAMERA_LIVE_STREAM_URL_HD = os.environ.get('CAMERA_LIVE_STREAM_URL_HD', 'http://easynvr-host:39100/live.flv')
 CAMERA_LIVE_STREAM_URL_SMOOTH = os.environ.get('CAMERA_LIVE_STREAM_URL_SMOOTH', '')
-EASYNVR_BASE_URL = os.environ.get('EASYNVR_BASE_URL', 'http://192.168.5.17:10000')
+EASYNVR_BASE_URL = os.environ.get('EASYNVR_BASE_URL', 'http://easynvr-host:10000')
 EASYNVR_USERNAME = os.environ.get('EASYNVR_USERNAME', 'admin')
 EASYNVR_PASSWORD = os.environ.get('EASYNVR_PASSWORD', 'admin')
 API_TOKEN = os.environ.get('CAT_WATER_API_TOKEN', '').strip()
-EASYNVR_CHANNEL_ID = os.environ.get('EASYNVR_CHANNEL_ID', 'OpD6HNpPU8j0X_profile_1')
+EASYNVR_CHANNEL_ID = os.environ.get('EASYNVR_CHANNEL_ID', 'EASYNVR_CHANNEL_PLACEHOLDER_profile_1')
 EASYNVR_CHANNEL_ID_HD = os.environ.get('EASYNVR_CHANNEL_ID_HD', EASYNVR_CHANNEL_ID)
-EASYNVR_CHANNEL_ID_SMOOTH = os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', 'OpD6HNpPU8j0X_profile_2')
+EASYNVR_CHANNEL_ID_SMOOTH = os.environ.get('EASYNVR_CHANNEL_ID_SMOOTH', 'EASYNVR_CHANNEL_PLACEHOLDER_profile_2')
 MEDIA_DIR = BASE_DIR / 'media'
 MEDIA_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
@@ -79,7 +79,7 @@ def live_flv_url(mode='smooth'):
 
 DEFAULT_SETTINGS = {
     'cameraName': 'cat-water-cam-01',
-    'rtspUrl': 'rtsp://admin:***@192.168.5.30:554/stream1',
+    'rtspUrl': 'rtsp://admin:***@192.168.1.100:554/stream1',
     'roi': {'x1': 820, 'y1': 540, 'x2': 1320, 'y2': 980},
     'fpsSample': 2,
     'minPresenceSec': 3,
@@ -2329,7 +2329,7 @@ class Handler(SimpleHTTPRequestHandler):
                 d += timedelta(days=1)
             all_files = []
             for ds in sorted(dates):
-                rec_dir = Path(f'/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1/{ds}')
+                rec_dir = Path(f'/easynvr_rec/easynvr_rec/EASYNVR_CHANNEL_PLACEHOLDER/profile_1/{ds}')
                 if rec_dir.exists():
                     for f in sorted(rec_dir.glob('*.mp4')):
                         if len(f.name) >= 14 and f.name[:14].isdigit():

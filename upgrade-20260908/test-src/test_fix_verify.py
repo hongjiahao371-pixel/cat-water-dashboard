@@ -131,7 +131,7 @@ def check_cat_at_water(cat_box, wzone):
     return in_water_x and (head_near_water or spans_water)
 
 # ── Scan recordings ──
-REC_BASE = '/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1'
+REC_BASE = '/easynvr_rec/easynvr_rec/EASYNVR_CHANNEL_PLACEHOLDER/profile_1'
 
 def scan_recordings(date_str, hour_start, hour_end, sample_sec=3):
     """Scan recordings for a date range, sample frames, run both logics."""

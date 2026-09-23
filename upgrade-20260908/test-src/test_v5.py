@@ -8,7 +8,7 @@ SETTINGS_FILE = Path('/app/data/settings.json')
 settings = json.loads(SETTINGS_FILE.read_text()) if SETTINGS_FILE.exists() else {}
 fw = settings.get('frameWidth', 1280)
 fh = settings.get('frameHeight', 720)
-REC_BASE = '/easynvr_rec/easynvr_rec/OpD6HNpPU8j0X/profile_1'
+REC_BASE = '/easynvr_rec/easynvr_rec/EASYNVR_CHANNEL_PLACEHOLDER/profile_1'
 
 def sz(zone, sw, sh, fw2, fh2):
     if not zone: return None

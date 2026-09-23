@@ -4,7 +4,7 @@ import json, os, base64, hashlib, re as _re, tempfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-CAMERA_IP = os.environ.get('CAMERA_IP', '192.168.5.41')
+CAMERA_IP = os.environ.get('CAMERA_IP', '192.168.1.100')
 CAMERA_ONVIF_PORT = int(os.environ.get('CAMERA_ONVIF_PORT', '2020'))
 CAMERA_USER = os.environ.get('CAMERA_USER', '')
 CAMERA_PASS = os.environ.get('CAMERA_PASS', '')
