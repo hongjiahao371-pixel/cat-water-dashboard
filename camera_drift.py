@@ -9,28 +9,32 @@ CAMERA_ONVIF_PORT = int(os.environ.get('CAMERA_ONVIF_PORT', '2020'))
 CAMERA_USER = os.environ.get('CAMERA_USER', '')
 CAMERA_PASS = os.environ.get('CAMERA_PASS', '')
 DRIFT_SYNC_THRESHOLD = float(os.environ.get('DRIFT_SYNC_THRESHOLD', '10'))
+CAMERA_OFFSET_FILE = os.environ.get('CAMERA_OFFSET_FILE', '/app/data/camera_offset.json')
 CST = timezone(timedelta(hours=8))
 
 def _onvif_request(soap_body):
-    """Send ONVIF request with WS-Security UsernameToken auth. Raises on HTTP error."""
+    """Send ONVIF request. WS-Security header only when credentials are set;
+    GetSystemDateAndTime is readable unauthenticated on this camera."""
     import urllib.request
     nonce = os.urandom(16)
     created = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
-    digest = base64.b64encode(hashlib.sha1(nonce + created.encode() + CAMERA_PASS.encode()).digest()).decode()
-    nonce_b64 = base64.b64encode(nonce).decode()
+    auth_header = ''
+    if CAMERA_USER:
+        digest = base64.b64encode(hashlib.sha1(nonce + created.encode() + CAMERA_PASS.encode()).digest()).decode()
+        nonce_b64 = base64.b64encode(nonce).decode()
+        auth_header = (
+            '<Security s:mustUnderstand="1" xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">'
+            '<UsernameToken>'
+            '<Username>' + CAMERA_USER + '</Username>'
+            '<Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">' + digest + '</Password>'
+            '<Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#Base64Binary">' + nonce_b64 + '</Nonce>'
+            '<Created xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">' + created + '</Created>'
+            '</UsernameToken></Security>')
     envelope = (
         '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"'
         ' xmlns:tds="http://www.onvif.org/ver10/device/wsdl"'
         ' xmlns:tt="http://www.onvif.org/ver10/schema">'
-        '<s:Header>'
-        '<Security s:mustUnderstand="1" xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">'
-        '<UsernameToken>'
-        '<Username>' + CAMERA_USER + '</Username>'
-        '<Password Type="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordDigest">' + digest + '</Password>'
-        '<Nonce EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary">' + nonce_b64 + '</Nonce>'
-        '<Created xmlns="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">' + created + '</Created>'
-        '</UsernameToken>'
-        '</Security>'
+        '<s:Header>' + auth_header +
         '</s:Header>'
         '<s:Body>' + soap_body + '</s:Body>'
         '</s:Envelope>'
@@ -84,10 +88,12 @@ def _sync_camera_time():
     _onvif_request(soap)
 
 def check_camera_drift():
-    """Check camera drift, auto-sync if above threshold."""
-    if not CAMERA_USER or not CAMERA_PASS:
-        print('Camera drift: skipped because ONVIF credentials are not configured')
-        return
+    """Check camera drift, auto-sync if above threshold.
+
+    Time reading needs no credentials on this camera; auto-sync does, so a
+    large drift without credentials is reported as NEEDS_CREDS instead of
+    skipping the whole check.
+    """
     try:
         cam_time = _get_camera_time()
         if cam_time is None:
@@ -98,6 +104,12 @@ def check_camera_drift():
 
         # Auto-sync if drift exceeds threshold
         if abs(drift) > DRIFT_SYNC_THRESHOLD:
+            if not CAMERA_USER or not CAMERA_PASS:
+                print("Camera drift: %.1fs exceeds threshold but ONVIF "
+                      "credentials are not configured" % drift)
+                tag = "NEEDS_CREDS"
+                _record_offset(cam_time, nas_time, drift, False, tag)
+                return
             print("Camera drift: %.1fs - auto-syncing..." % drift)
             try:
                 _sync_camera_time()
@@ -120,32 +132,36 @@ def check_camera_drift():
             cam_time.strftime('%H:%M:%S'),
             nas_time.strftime('%H:%M:%S')
         ))
-
-        # Record history
-        offset_file = Path('/app/data/camera_offset.json')
-        history = {}
-        if offset_file.exists():
-            try:
-                history = json.loads(offset_file.read_text())
-            except Exception:
-                pass
-        history.setdefault('history', []).append({
-            'time': nas_time.isoformat(),
-            'offset_seconds': round(drift, 1),
-            'synced': tag == 'SYNCED'
-        })
-        history['history'] = history['history'][-100:]
-        with tempfile.NamedTemporaryFile(
-            mode='w', encoding='utf-8', dir=offset_file.parent,
-            prefix=f'.{offset_file.name}.', suffix='.tmp', delete=False,
-        ) as handle:
-            json.dump(history, handle, indent=2)
-            handle.flush()
-            os.fsync(handle.fileno())
-            tmp_path = Path(handle.name)
-        os.replace(tmp_path, offset_file)
+        _record_offset(cam_time, nas_time, drift, tag == 'SYNCED', tag)
     except Exception as e:
         print("Camera drift check failed: %s" % e)
+
+
+def _record_offset(cam_time, nas_time, drift, synced, tag):
+    offset_file = Path(CAMERA_OFFSET_FILE)
+    offset_file.parent.mkdir(parents=True, exist_ok=True)
+    history = {}
+    if offset_file.exists():
+        try:
+            history = json.loads(offset_file.read_text())
+        except Exception:
+            pass
+    history.setdefault('history', []).append({
+        'time': nas_time.isoformat(),
+        'offset_seconds': round(drift, 1),
+        'synced': synced,
+        'tag': tag,
+    })
+    history['history'] = history['history'][-100:]
+    with tempfile.NamedTemporaryFile(
+        mode='w', encoding='utf-8', dir=offset_file.parent,
+        prefix=f'.{offset_file.name}.', suffix='.tmp', delete=False,
+    ) as handle:
+        json.dump(history, handle, indent=2)
+        handle.flush()
+        os.fsync(handle.fileno())
+        tmp_path = Path(handle.name)
+    os.replace(tmp_path, offset_file)
 
 if __name__ == '__main__':
     check_camera_drift()
