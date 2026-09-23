@@ -145,12 +145,14 @@ services:
     - ./media:/app/media
     - ./models:/app/models:ro
     - ./models/locate-anything-q6_k.gguf:/models/locate-anything-q6_k.gguf:ro
+    - ./locate-libs/liblocate_anything.so:/usr/local/lib/liblocate_anything.so:ro
     - ${EASYNVR_REC_HOST_DIR:-./easynvr-rec}:/easynvr_rec:ro
     - ./calibrate:/app/calibrate:ro
     - ./server.py:/app/server.py:ro
     - ./auth.js:/app/auth.js:ro
     - ./notification_delivery.py:/app/notification_delivery.py:ro
     - ./supervisor.py:/app/supervisor.py:ro
+    - ./camera_drift.py:/app/camera_drift.py:ro
     - ./detection_worker.py:/app/detection_worker.py:ro
     - ./camera_worker.py:/app/camera_worker.py:ro
     - ./hd_live_worker.py:/app/hd_live_worker.py:ro

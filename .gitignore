@@ -50,3 +50,4 @@ upgrade-20260908/benchmark-results/
 recent-clips.tar
 *.tar
 *.onnx
+locate-libs/
