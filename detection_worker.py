@@ -660,6 +660,57 @@ class TemporalClassifierGate:
         return now <= self.hold_until
 
 
+class SustainedEvidence:
+    """Time-weighted 2s-window sustained-evidence accumulator (0.625 gate).
+
+    Accepted 2026-09-23 for production after: dev set 7/7 positives 0/6
+    negatives, reference clip 58.5s (= plain ROI), and a zero-false-positive
+    replay of the blind-labeled 2026-09-09 window (93 segments).
+    """
+
+    def __init__(self, threshold=.625, window=2., fraction=.8, max_gap=.4):
+        self.threshold, self.window, self.fraction, self.max_gap = \
+            threshold, window, fraction, max_gap
+        self.samples = deque()
+
+    def observe(self, t, score):
+        if self.samples and (t <= self.samples[-1][0] or
+                             t - self.samples[-1][0] > self.max_gap):
+            self.samples.clear()
+        self.samples.append((t, score))
+        while len(self.samples) > 1 and self.samples[1][0] <= t - self.window:
+            self.samples.popleft()
+        if t - self.samples[0][0] < self.window - 1e-6:
+            return False
+        # Time weighted evidence: duplicate/uneven samples cannot inflate votes.
+        credit = sum(
+            max(0, b[0] - max(a[0], t - self.window))
+            for a, b in zip(self.samples, list(self.samples)[1:])
+            if a[1] >= self.threshold and b[1] >= self.threshold)
+        return score >= self.threshold and credit >= self.window * self.fraction - 1e-6
+
+
+class SustainedROIGate(TemporalClassifierGate):
+    """ROI gate: keep the high-confidence route, add a sustained 0.625 route.
+
+    The supplemental route needs 2s of >=80% sustained ROI evidence and flows
+    through the same event state machine, recovering low-peak drinking visits
+    that never reach the 0.80 anchor threshold.
+    """
+
+    def __init__(self, threshold):
+        super().__init__(threshold=threshold)
+        self.sustained = SustainedEvidence(threshold=.625)
+
+    def observe(self, now, cat_candidate, closeup_water, confidence, cat_box=None):
+        baseline = super().observe(now, cat_candidate, closeup_water, confidence, cat_box)
+        supplemental = self.sustained.observe(
+            now, confidence if cat_candidate and closeup_water else 0.)
+        if supplemental:
+            self.last_confidence = float(confidence)
+        return baseline or supplemental
+
+
 class DrinkingCandidateGate:
     """Keep pre-event duration contiguous across only very short frame gaps."""
 
@@ -1341,7 +1392,7 @@ def main():
     temporal_night_gate = TemporalClassifierGate(
         threshold=NIGHT_CLASSIFIER_TEMPORAL_ANCHOR_THRESHOLD,
     )
-    temporal_roi_gate = TemporalClassifierGate(threshold=detector._roi_classifier.threshold)
+    temporal_roi_gate = SustainedROIGate(threshold=detector._roi_classifier.threshold)
     candidate_gate = DrinkingCandidateGate()
     active_drink_evidence = ActiveDrinkEvidence()
     review_recorder = ReviewSampleRecorder()
@@ -1372,6 +1423,7 @@ def main():
         candidate_gate.reset()
         active_drink_evidence.reset()
         temporal_roi_gate.hits.clear()
+        temporal_roi_gate.sustained.samples.clear()
         temporal_roi_gate.hold_until = float('-inf')
         temporal_roi_gate.last_box = None
         temporal_roi_gate.last_confidence = 0.0
