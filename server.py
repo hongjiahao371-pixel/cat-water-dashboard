@@ -1811,6 +1811,16 @@ def update_event_verification(event_id, payload):
         event = find_event(data.get('events', []), event_id)
         if event is None:
             raise KeyError(event_id)
+        # Stream-dropout windows can leave the archive clip misaligned (no cat
+        # frames at all). A high-confidence realtime detection diverging from an
+        # anchorless clip signals a recording gap, not a false positive: park it
+        # as uncertain for human review instead of writing it off.
+        if (status == 'rejected' and int(detail.get('anchors', 0) or 0) == 0
+                and float(event.get('drinkingConfidence') or 0) >= 0.90):
+            status = 'uncertain'
+            detail['status'] = 'uncertain'
+            detail['reason'] = ('recording content mismatch (stream dropout window); '
+                                'live evidence retained for human review')
         event['verificationStatus'] = status
         event['archiveVerification'] = detail
         current_method = event.get('volumeMethod', 'legacy_event_duration_v1')
