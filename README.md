@@ -54,10 +54,15 @@
 要求: Docker；Intel GPU `/dev/dri` 为可选加速，驱动不可用时自动使用 CPU
 
 ```bash
-# 1. 准备模型
-mkdir -p models
-# 下载 yolov8n ONNX 模型放入 models/
-# 将 locate-anything-q6_k.gguf 放入 models/；必须遵守 NVIDIA 模型许可
+# 1. 准备模型（必需: YOLOv8n 检测模型；其余可选）
+python3 scripts/download_models.sh
+# ↑ 自动下载并导出 YOLOv8n ONNX（需要 python3 + 网络）
+#
+# 可选增强（不装也能跑，对应功能自动优雅停用）:
+#   - LocateAnything 语义复核: 下载 locate-anything-q6_k.gguf 放入 models/
+#     （5.5GB，遵循 NVIDIA 模型许可）
+#   - ROI 个性化饮水分类器: 决定识别准确率上限，按 training/README.md
+#     用你自己相机的样本训练（自带模型是特定相机视角的，通用性有限）
 
 # 2. 发现并配置相机
 python3 scripts/discover_camera.py
