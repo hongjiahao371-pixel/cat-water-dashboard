@@ -1,6 +1,6 @@
 #!/bin/bash
 # Daily classifier accuracy regression for cat-water-dashboard.
-# Run: docker exec cat-water-detector python3 - < tests/regression_accuracy.py
+# Run: docker exec cat-water python3 - < tests/regression_accuracy.py
 # Alerts to Feishu webhook on FAIL or crash. Retains 30 days of logs.
 set -u
 REPO="$(cd "$(dirname "$0")/.." \&\& pwd)"

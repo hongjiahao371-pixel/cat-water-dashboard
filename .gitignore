@@ -51,3 +51,4 @@ recent-clips.tar
 *.tar
 *.onnx
 locate-libs/
+pylibs/

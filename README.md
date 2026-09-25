@@ -80,6 +80,18 @@ docker compose run --rm cat-water-locate-verifier \
   python3 -u locate_verifier_worker.py --once --event-id EVENT_ID
 ```
 
+### 可选：相机时钟对时监控
+
+相机时钟漂移会让录像/画面 OSD 的时间标签偏移。发现相机并在 .env 配置
+`CAMERA_IP`（必填）与 `CAMERA_USER`/`CAMERA_PASS`（自动对时需要）后：
+
+    python3 scripts/setup_clock_monitor.sh
+
+即安装每日 04:15 的自动任务：漂移 <10 秒仅记录，超过则通过 ONVIF 自动把相机
+时钟校准到 NAS 时间。注意：部分相机固件（如 TP-LINK IPC）不开放 ONVIF 时间
+写入（会报 Authority failure），此时请在相机自己的网页设置里启用 NTP 对时；
+监控仍会每日记录漂移曲线，超阈值时提示 NEEDS_CREDS。
+
 ## 环境变量 (检测器)
 
 核心阈值可通过环境变量调整，无需修改代码:
