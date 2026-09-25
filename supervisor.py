@@ -25,17 +25,22 @@ LOG_DIR = DATA / "worker_logs"
 STATUS_FILE = DATA / "supervisor_status.json"
 CST = timezone(timedelta(hours=8))
 
+# (name, cmd, optional): optional workers (e.g. the 5.5GB LocateAnything
+# semantic verifier) are skipped with a clear status after repeated startup
+# failures instead of crash-looping forever - fresh installs without the
+# optional model stay healthy.
 WORKERS = [
-    ("dashboard", ["python3", "-u", "server.py"]),
-    ("detector", ["python3", "-u", "detection_worker.py"]),
-    ("camera", ["python3", "-u", "camera_worker.py"]),
-    ("transcode", ["python3", "-u", "hd_live_worker.py"]),
-    ("archive-verifier", ["python3", "-u", "archive_verifier_worker.py"]),
-    ("daily-audit", ["python3", "-u", "daily_audit_worker.py"]),
-    ("notifier", ["python3", "-u", "notification_worker.py"]),
-    ("model-trainer", ["python3", "-u", "classifier_calibration_worker.py"]),
-    ("locate-verifier", ["python3", "-u", "locate_verifier_worker.py"]),
+    ("dashboard", ["python3", "-u", "server.py"], False),
+    ("detector", ["python3", "-u", "detection_worker.py"], False),
+    ("camera", ["python3", "-u", "camera_worker.py"], False),
+    ("transcode", ["python3", "-u", "hd_live_worker.py"], False),
+    ("archive-verifier", ["python3", "-u", "archive_verifier_worker.py"], False),
+    ("daily-audit", ["python3", "-u", "daily_audit_worker.py"], False),
+    ("notifier", ["python3", "-u", "notification_worker.py"], False),
+    ("model-trainer", ["python3", "-u", "classifier_calibration_worker.py"], False),
+    ("locate-verifier", ["python3", "-u", "locate_verifier_worker.py"], True),
 ]
+GIVE_UP_AFTER = 3  # consecutive failures for optional workers
 
 BACKOFF_BASE = 5.0
 BACKOFF_MAX = 60.0
@@ -84,9 +89,10 @@ def write_status():
                 "pid": meta.get(name, {}).get("pid"),
                 "running": name in procs and procs[name].poll() is None,
                 "restarts": meta.get(name, {}).get("restarts", 0),
+                "given_up": meta.get(name, {}).get("given_up", False),
                 "last_exit_code": meta.get(name, {}).get("last_exit_code"),
                 "started_at": meta.get(name, {}).get("started_at"),
-            } for name, _ in WORKERS
+            } for name, _cmd, _opt in WORKERS
         },
     }
     tmp = STATUS_FILE.with_suffix(".tmp")
@@ -106,13 +112,15 @@ def handle_signal(signum, frame):
 def main():
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
-    for name, cmd in WORKERS:
+    for name, cmd, optional in WORKERS:
         spawn(name, cmd)
     write_status()
     while not stopping:
         time.sleep(5)
         respawn = []
-        for name, cmd in WORKERS:
+        for name, cmd, optional in WORKERS:
+            if meta.get(name, {}).get("given_up"):
+                continue
             proc = procs.get(name)
             if proc is None or proc.poll() is None:
                 continue
@@ -125,6 +133,12 @@ def main():
                 m["failures"] = 0
             failures = m.get("failures", 0) + 1
             m["failures"] = failures
+            if optional and failures >= GIVE_UP_AFTER:
+                m["given_up"] = True
+                print(f"[{stamp()}] optional worker {name} failed {failures}x - "
+                      f"giving up (optional component; fix the cause and restart "
+                      f"the container to re-enable)", flush=True)
+                continue
             delay = min(BACKOFF_MAX, BACKOFF_BASE * (2 ** min(failures, 5)))
             respawn.append((name, cmd, m.get("exit_at", 0) or now(), delay))
             m["exit_at"] = now()
