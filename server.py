@@ -217,6 +217,39 @@ def load_review_candidates():
     }
 
 
+def preserve_review_sample_snapshot(sample_id, label):
+    """Keep a permanent copy of the labeled snapshot for future training
+    (review candidates rotate; labels whose images are gone cannot be
+    reused by the ROI classifier training pipeline)."""
+    try:
+        src = None
+        review = load_review_candidates()
+        items = review.get("candidates", []) if isinstance(review, dict) else review
+        cand = next((c for c in items if c.get("id") == sample_id), None)
+        if cand and cand.get("snapshot_url"):
+            src = str(cand["snapshot_url"])
+        else:
+            # 轮转后候选已不在队列：样本 id 即文件名，直接探测两个已知目录
+            for base in ("audit_candidates", "review_candidates"):
+                p = MEDIA / base / f"{sample_id}.jpg"
+                if p.is_file():
+                    src = f"/media/{base}/{sample_id}.jpg"
+                    break
+        if not src or not str(src).startswith(("/media/review_candidates/", "/media/audit_candidates/")):
+            return
+        src_path = (MEDIA / str(src).lstrip("/")).resolve()
+        media_root = MEDIA.resolve()
+        if not str(src_path).startswith(str(media_root)) or not src_path.is_file():
+            return
+        dest_dir = DATA_DIR / "roi_dataset_raw" / label
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f"{sample_id}.jpg"
+        if not dest.exists():
+            shutil.copy2(src_path, dest)
+    except Exception as exc:
+        print(f"preserve_review_sample_snapshot failed for {sample_id}: {exc}")
+
+
 def label_review_candidate(sample_id, label):
     if label not in ('drinking', 'not_drinking', 'no_cat'):
         raise ValueError('label must be drinking/not_drinking/no_cat')
@@ -231,6 +264,7 @@ def label_review_candidate(sample_id, label):
         })
         labels[sample_id] = annotation
         write_json(REVIEW_LABELS_FILE, labels, skip_lock=True)
+        preserve_review_sample_snapshot(sample_id, label)
     return labels[sample_id]
 
 
