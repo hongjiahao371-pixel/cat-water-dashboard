@@ -15,7 +15,7 @@ CAMERA_ONVIF_PORT = int(os.environ.get("CAMERA_ONVIF_PORT", "2020"))
 CAMERA_USER = os.environ.get("CAMERA_USER", "")
 CAMERA_PASS = os.environ.get("CAMERA_PASS", "")
 DRIFT_SYNC_THRESHOLD = float(os.environ.get("DRIFT_SYNC_THRESHOLD", "10"))
-CAMERA_OFFSET_FILE = os.environ.get("CAMERA_OFFSET_FILE", "/app/data/camera_offset.json")
+CAMERA_OFFSET_FILE = os.environ.get("CAMERA_OFFSET_FILE", str(Path(__file__).resolve().parent.parent / "data" / "camera_offset.json"))
 CST = timezone(timedelta(hours=8))
 
 
